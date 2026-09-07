@@ -160,6 +160,25 @@ impl Event {
         }
     }
 
+    /// An audited entry for something the user asked for.
+    ///
+    /// A user decision is audited for the same reason an action is: it changed
+    /// what CoreScout is permitted to do. Its reason is not a judgement
+    /// CoreScout made, so it is filled in as what it is, and the caller
+    /// supplies what the decision was expected to achieve.
+    pub fn decision(
+        summary: impl Into<String>,
+        subject: impl Into<String>,
+        expected: impl Into<String>,
+    ) -> Event {
+        Event {
+            subject: Some(subject.into()),
+            reason: Some("you asked for it".into()),
+            expected: Some(expected.into()),
+            ..Event::new(EventKind::UserDecision, Severity::Notice, summary)
+        }
+    }
+
     /// Name what this happened to.
     pub fn about(mut self, subject: impl Into<String>) -> Event {
         self.subject = Some(subject.into());
@@ -223,6 +242,20 @@ mod tests {
         // legitimate is exporting them as if they were reviewed.
         let event = Event::action("a", "b", "c", "d");
         assert!(!event.is_accountable());
+    }
+
+    #[test]
+    fn a_user_decision_is_accountable_once_its_outcome_is_known() {
+        // Audited for the same reason an action is: it changed what CoreScout
+        // is permitted to do.
+        let event = Event::decision(
+            "autonomy changed from Suggest to Assist",
+            "settings",
+            "CoreScout may make small reversible changes without asking",
+        )
+        .outcome("recorded");
+        assert!(event.is_audited());
+        assert!(event.is_accountable());
     }
 
     #[test]

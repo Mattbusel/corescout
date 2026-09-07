@@ -274,3 +274,103 @@ cycle and says nothing about efficiency in the sense an operator pays for.
 **Context switches on Windows.** Not exposed per thread, so the benchmark falls
 back to statistical outlier detection alone. That is a real loss of measurement
 quality on this platform.
+
+**A model in the loop.** Everything in section 10 was produced with a program
+standing in for an agent. Nothing here measures what happens with a real model
+attached, and the demo says so where it prints its results.
+
+---
+
+## 10. The product, on this machine
+
+The application, the service and the bridge all run here.
+
+```text
+corescout status
+  CoreScout 0.3.0 is running.
+  Mode suggest.
+  55 reflections this run, 0 recurring states, 0 AI actions observed.
+
+corescout computer
+  13th Gen Intel(R) Core(TM) i7-13700KF
+  16 cores, 24 threads, mixed core types
+  86 entities x 9 channels, 216 observed
+
+corescout diagnostics
+  Observation costs 70102 ns on average, 521800 at worst.
+  That is 0.0280% of one core at the current interval of 250 ms.
+```
+
+### An honest correction to a number this project has quoted
+
+Earlier sections report an observation pass at **6.8 microseconds**. That is
+`corescout mirror --once` in a tight loop, with warm caches, and it is a true
+measurement of that.
+
+The number the product actually pays is **70 microseconds**, measured as the
+mean over a service sampling four times a second. The difference is cold cache
+between samples. It is ten times larger and it is the honest figure to show
+somebody deciding whether to leave this running, so Settings shows that one,
+measured on their machine rather than quoted from this one.
+
+### The demonstration
+
+`corescout-demo` builds a real crate with a real trap: a source file generated
+from a schema, where a stale generated file compiles cleanly and fails its
+test. Same agent, same repository, twice.
+
+```text
+                     fresh    experienced
+  tasks completed         8              8
+  builds run             11              8
+  builds failed           3              0
+  failure rate          27%             0%
+  seconds               8.7            9.5
+```
+
+Two things in that are worth not skipping past.
+
+**The experienced run took longer.** Fewer failures, more wall clock, because
+the remedy has a cost: it regenerates every time, and regenerating is not free.
+Failure rate went to zero and elapsed time went up by 9%. A product that
+reported only the first number would be selling something.
+
+**The fresh CoreScout learned during the eight tasks.** Three failures, then
+none, because it noticed the association and started suggesting it. That
+narrows the gap between the two conditions and it is the correct outcome; a
+demonstration tuned to keep the naive condition naive would be a demonstration
+of nothing.
+
+What it ended with, after 260 warm-up tasks:
+
+```text
+[Verified]  cargo run --bin generate, then cargo build
+            cargo build is more reliable here when the first step runs first.
+```
+
+Reaching *Verified* took that many occasions because the exploration rate is
+small on purpose: every randomised trial is one where CoreScout may withhold
+something that would have helped. At thirty tasks it had the correlation and
+said so, and nothing more:
+
+```text
+[Seen together]  cargo build works better after cargo run --bin generate
+                 When the generator ran first, cargo build failed 0% of the
+                 time instead of 100%.
+[still testing]  2 and 1 randomised trials, 8 needed on each side
+```
+
+That is the product refusing to promote something it has not tested, on real
+builds, with a real difference sitting right in front of it.
+
+### What the tests establish that the demo does not
+
+`integration/tests/product_loop.rs` runs the same loop with a known ground
+truth, through the real MCP server, and asserts the things a single
+demonstration cannot:
+
+- a correlation is never promoted, however much of it there is
+- randomised assignment on both arms produces a capability, and nothing else does
+- CoreScout does sometimes withhold its own suggestion, and less often than it offers it
+- an agent that never verifies anything teaches CoreScout nothing false
+- what was learned while one model was connected is reachable by the next one

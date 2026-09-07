@@ -45,6 +45,18 @@ use crate::view;
 /// The build, reported to clients and stamped on stored state.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// What CoreScout says when it is deliberately not offering its own suggestion.
+///
+/// Worded so an agent reads it as an instruction rather than as an absence,
+/// and so a person reading a transcript can see the experiment happening.
+const WITHHELD: &str = "CoreScout is checking whether its own suggestion actually helps, so it \
+                        is not offering it this time. Do the operation as you normally would, \
+                        and tell CoreScout how it went.";
+
+/// What it says about something it has noticed and not yet tested.
+const UNTESTED: &str = "CoreScout noticed this and has not tested it yet. Try it and report the \
+                        outcome, which is what turns it into something it can be sure about.";
+
 /// Rows used to fit the normaliser before recognition starts.
 ///
 /// Fitting on everything and then recognising over the same data lets the
@@ -87,9 +99,49 @@ pub struct Engine {
     interval_ms: u64,
     observing: bool,
     trail: Vec<Sample>,
+    /// Trials handed out and not yet settled, by session and operation.
+    ///
+    /// Not persisted: a trial whose outcome nobody reported is a trial that
+    /// never happened, and carrying one across a restart would let a stale
+    /// assignment collect an outcome from a run it had nothing to do with.
+    pending: BTreeMap<(String, String), Pending>,
     seed: u64,
     /// Set when learned state has changed and has not yet been written.
     dirty: bool,
+}
+
+/// A trial handed out and waiting for its outcome.
+#[derive(Clone, Debug)]
+struct Pending {
+    procedure: String,
+    applied: bool,
+    /// Whether the coin decided rather than belief.
+    ///
+    /// Never sent to the agent. An agent that knew it was in the randomised
+    /// arm might behave differently, and then the arm would not be measuring
+    /// what it claims to be measuring.
+    randomised: bool,
+    at_ms: u64,
+}
+
+/// What CoreScout suggests before an operation.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Advice {
+    /// The operation this is about, normalised.
+    pub operation: String,
+    /// Whether CoreScout has anything to suggest at all.
+    pub has_advice: bool,
+    /// What to do first, if anything.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<String>,
+    /// Why, in one sentence a person or a model can read.
+    pub because: String,
+    /// Whether this rests on randomised evidence or only on observation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basis: Option<String>,
+    /// What is known about how this operation tends to go here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub history: Option<String>,
 }
 
 impl Engine {
@@ -156,6 +208,7 @@ impl Engine {
             interval_ms: 250,
             observing: false,
             trail: Vec::new(),
+            pending: BTreeMap::new(),
             seed,
             dirty: false,
         })
@@ -205,6 +258,22 @@ impl Engine {
     pub fn open_questions(&self) -> Vec<view::Question> {
         self.experience
             .procedures()
+            // Only the ones still open. A settled procedure listed under
+            // "still uncertain", with "nothing: this is settled" beside it,
+            // is a screen contradicting itself.
+            .filter(|procedure| !procedure.is_established())
+            // And not one that already produced a capability. Evidence ages
+            // out, so a procedure that was established when its capability was
+            // created can fall back below the bar later. That is the belief
+            // machinery working, but the question "does this help" was already
+            // answered: what is happening now is re-verification, which
+            // belongs on the capability's own card rather than in a list of
+            // things CoreScout does not know.
+            .filter(|procedure| {
+                !self
+                    .capabilities
+                    .contains_key(&format!("cap-{}", procedure.id))
+            })
             .map(|procedure| view::Question {
                 id: procedure.id.clone(),
                 name: procedure.name.clone(),
@@ -446,6 +515,19 @@ impl Engine {
         self.experience.observe(&action);
         self.dirty = true;
 
+        // Settle any trial this action was the outcome of. Without this the
+        // procedures accumulate no randomised evidence at all, and no
+        // capability could ever be created from real use.
+        if let Some(trial) = self
+            .pending
+            .remove(&(action.session.clone(), action.fingerprint.clone()))
+        {
+            let failed = action.visibly_failed();
+            if let Some(procedure) = self.experience.procedure_mut(&trial.procedure) {
+                procedure.record(trial.applied, failed, trial.randomised, now);
+            }
+        }
+
         if action.is_silent_failure() {
             self.note(
                 Event::new(
@@ -474,6 +556,116 @@ impl Engine {
         self.promote();
         let _ = self.store.put(Kind::Action, &action.id, &action);
         action
+    }
+
+    /// What to do before an operation, and the experiment that goes with it.
+    ///
+    /// This is where randomisation actually happens. An agent asks what to do;
+    /// on most occasions CoreScout answers from what it believes, and on a
+    /// small fraction it answers from a coin. Only the second kind of trial
+    /// can tell a cause from a coincidence, and this is the only place in the
+    /// product that produces one.
+    ///
+    /// The cost is real and worth stating plainly: on a randomised occasion
+    /// CoreScout may deliberately withhold a procedure that would have saved
+    /// somebody a failed build. That is what the evidence costs.
+    pub fn advise(&mut self, session: &str, operation: &str, workspace: Option<&str>) -> Advice {
+        let fingerprint = corescout_agent_observation::fingerprint::normalise(operation);
+        let history = self
+            .experience
+            .operation(&fingerprint, workspace)
+            .filter(|mode| mode.attempts >= 3)
+            .map(|mode| mode.headline());
+
+        let chosen = self
+            .experience
+            .procedures()
+            .find(|procedure| {
+                procedure.target == fingerprint && procedure.workspace.as_deref() == workspace
+            })
+            .map(|procedure| procedure.id.clone());
+
+        let Some(id) = chosen else {
+            return Advice {
+                operation: fingerprint,
+                has_advice: false,
+                steps: Vec::new(),
+                because: match &history {
+                    Some(line) => format!("{line}. CoreScout has no better way to offer yet."),
+                    None => "CoreScout knows nothing about this operation yet.".into(),
+                },
+                basis: None,
+                history,
+            };
+        };
+
+        // Believe the procedure helps unless the evidence says otherwise. An
+        // untested one is worth applying while it is being tested, which is
+        // what makes the trial cheap for the person whose machine it is.
+        let believed = self
+            .experience
+            .procedure_mut(&id)
+            .and_then(|procedure| procedure.basis())
+            .map(|basis| match basis {
+                Basis::Causal { delta, .. } => delta < 0.0,
+                Basis::Association {
+                    rate_with,
+                    rate_without,
+                    ..
+                } => rate_with < rate_without,
+            })
+            .unwrap_or(true);
+
+        let Some(procedure) = self.experience.procedure_mut(&id) else {
+            return Advice {
+                operation: fingerprint,
+                has_advice: false,
+                steps: Vec::new(),
+                because: "CoreScout knows nothing about this operation yet.".into(),
+                basis: None,
+                history,
+            };
+        };
+        let (apply, randomised) = procedure.decide(believed);
+        let steps: Vec<String> = procedure
+            .steps
+            .iter()
+            .map(|step| step.action.clone())
+            .collect();
+        let basis = procedure.basis();
+
+        self.pending.insert(
+            (session.to_string(), fingerprint.clone()),
+            Pending {
+                procedure: id,
+                applied: apply,
+                randomised,
+                at_ms: now_ms(),
+            },
+        );
+        // Bounded: an agent that asks and never reports would otherwise leave
+        // one of these behind on every call.
+        if self.pending.len() > 512 {
+            let floor = now_ms().saturating_sub(60 * 60 * 1000);
+            self.pending.retain(|_, trial| trial.at_ms >= floor);
+        }
+
+        let label = basis.as_ref().map(|basis| basis.label().to_string());
+        let because = match (&basis, apply) {
+            (Some(basis), true) => basis.explain(),
+            (Some(_), false) => WITHHELD.into(),
+            (None, true) => UNTESTED.into(),
+            (None, false) => "Do the operation as you normally would.".into(),
+        };
+
+        Advice {
+            operation: fingerprint,
+            has_advice: apply && !steps.is_empty(),
+            steps: if apply { steps } else { Vec::new() },
+            because,
+            basis: label,
+            history,
+        }
     }
 
     /// An agent's session is over.
@@ -578,17 +770,16 @@ impl Engine {
         let before = self.permissions.autonomy();
         self.permissions.set_autonomy(autonomy);
         self.note(
-            Event::new(
-                EventKind::UserDecision,
-                Severity::Notice,
+            Event::decision(
                 format!(
                     "autonomy changed from {} to {}",
                     before.title(),
                     autonomy.title()
                 ),
+                "settings",
+                autonomy.summary(),
             )
-            .about("settings")
-            .outcome(autonomy.summary()),
+            .outcome("in force from now on"),
         );
     }
 
@@ -596,13 +787,8 @@ impl Engine {
     pub fn pause(&mut self) {
         self.permissions.pause();
         self.note(
-            Event::new(
-                EventKind::UserDecision,
-                Severity::Notice,
-                "CoreScout paused",
-            )
-            .about("settings")
-            .outcome("no further changes will be made"),
+            Event::decision("CoreScout paused", "settings", "nothing further is changed")
+                .outcome("every change is now refused, including anything already approved"),
         );
     }
 
@@ -611,13 +797,12 @@ impl Engine {
         self.permissions.resume();
         self.permissions.limiter_mut().forgive();
         self.note(
-            Event::new(
-                EventKind::UserDecision,
-                Severity::Notice,
+            Event::decision(
                 "CoreScout resumed",
+                "settings",
+                "changes may be made again, within your limits",
             )
-            .about("settings")
-            .outcome("changes may be made again, within your limits"),
+            .outcome("the pause is lifted and the failure count is cleared"),
         );
     }
 
@@ -629,23 +814,28 @@ impl Engine {
             )));
         }
         self.permissions.set_grant(id, grant.clone());
-        self.note(
-            Event::new(
-                EventKind::UserDecision,
-                Severity::Notice,
-                if grant.disabled {
-                    format!("{id} switched off")
-                } else if grant.auto_use {
-                    format!("{id} approved for your AI to use on its own")
-                } else if grant.approved {
-                    format!("{id} approved")
-                } else {
-                    format!("{id} approval withdrawn")
-                },
+        let (summary, expected) = if grant.disabled {
+            (
+                format!("{id} switched off"),
+                "it will not run again until you switch it back on",
             )
-            .about(id.to_string())
-            .outcome("recorded"),
-        );
+        } else if grant.auto_use {
+            (
+                format!("{id} approved for your AI to use on its own"),
+                "a connected AI may run it without asking you each time",
+            )
+        } else if grant.approved {
+            (
+                format!("{id} approved"),
+                "it may run, and you are asked before each use",
+            )
+        } else {
+            (
+                format!("{id} approval withdrawn"),
+                "it will not run until you approve it again",
+            )
+        };
+        self.note(Event::decision(summary, id.to_string(), expected).outcome("recorded"));
         Ok(())
     }
 
@@ -668,12 +858,11 @@ impl Engine {
         self.permissions.forget_grant(id);
         self.store.delete(Kind::Capability, id)?;
         self.note(
-            Event::new(
-                EventKind::UserDecision,
-                Severity::Notice,
+            Event::decision(
                 format!("{id} deleted"),
+                id.to_string(),
+                "the capability and the evidence behind it are removed",
             )
-            .about(id.to_string())
             .outcome("gone"),
         );
         Ok(())
@@ -789,6 +978,21 @@ impl Engine {
     pub fn learned(&self) -> Vec<view::LearnedCard> {
         let mut cards: Vec<view::LearnedCard> = Vec::new();
 
+        // A procedure that has become a capability is one thing, not three.
+        // Without this the Learned screen shows the capability, the causal
+        // finding behind it and the association it grew out of, all saying
+        // roughly the same sentence, and a reader counts three discoveries
+        // where there was one.
+        let mut superseded: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for capability in self.capabilities.values() {
+            if let Some(procedure) = capability.id.strip_prefix("cap-") {
+                superseded.insert(format!("pat-{procedure}"));
+                if let Some(suffix) = procedure.strip_prefix("proc-") {
+                    superseded.insert(format!("pat-assoc-{suffix}"));
+                }
+            }
+        }
+
         for capability in self.capabilities.values() {
             let grant = self.permissions.grant(&capability.id);
             let causal = matches!(capability.provenance, Provenance::Learned { .. });
@@ -809,6 +1013,9 @@ impl Engine {
         }
 
         for pattern in self.experience.patterns() {
+            if superseded.contains(&pattern.id) {
+                continue;
+            }
             cards.push(card_from(&pattern));
         }
 
@@ -1141,16 +1348,19 @@ impl Engine {
         self.dirty = true;
         self.persist()?;
         self.note(
-            Event::new(
-                EventKind::UserDecision,
-                Severity::Notice,
+            Event::decision(
                 if everything {
                     "everything CoreScout had learned was deleted"
                 } else {
                     "everything CoreScout knew about your AI activity was deleted"
                 },
+                "privacy",
+                if everything {
+                    "no record of this machine or of any AI that worked on it remains"
+                } else {
+                    "sessions, commands and outcomes go; what was learned about the machine stays"
+                },
             )
-            .about("privacy")
             .outcome(format!("{removed} records removed")),
         );
         Ok(removed)

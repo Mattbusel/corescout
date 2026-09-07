@@ -171,6 +171,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "corescout-demo"
+version = "0.3.0"
+dependencies = [
+ "corescout-product-api",
+ "corescout-storage",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "corescout-experiment"
 version = "0.3.0"
 dependencies = [
@@ -218,9 +228,12 @@ name = "corescout-integration"
 version = "0.3.0"
 dependencies = [
  "corescout-agency",
+ "corescout-agent-experience",
+ "corescout-agent-observation",
  "corescout-analysis",
  "corescout-autonomy",
  "corescout-capability",
+ "corescout-capability-runtime",
  "corescout-concept",
  "corescout-core",
  "corescout-counterfactual",
@@ -229,17 +242,22 @@ dependencies = [
  "corescout-identity",
  "corescout-intent",
  "corescout-lineage",
+ "corescout-mcp-server",
  "corescout-memory",
  "corescout-mirror",
  "corescout-observer",
+ "corescout-permissions",
+ "corescout-product-api",
  "corescout-report",
  "corescout-represent",
  "corescout-science",
  "corescout-selfmodel",
+ "corescout-storage",
  "corescout-substrate",
  "libc",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

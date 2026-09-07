@@ -59,11 +59,20 @@ pub fn normalise(name: &str) -> String {
             out.push(flag);
             continue;
         }
-        // A bare value after a flag is that flag's argument. Flags whose value
-        // matters are rare and the value is usually a path or a number, so
-        // dropping it is the conservative choice in the direction that
-        // produces silence rather than invention.
-        if out.last().is_some_and(|last| last.starts_with('-')) {
+        // A bare value after a flag is that flag's argument. Most of those
+        // vary between runs of the same operation: paths, numbers, hashes,
+        // temporary directories. But some of them *are* the operation:
+        // `cargo run --bin gen-schema` and `cargo run --bin server` are two
+        // different things, and merging them is the failure that invents
+        // patterns rather than the one that produces silence.
+        //
+        // So the value survives when it looks like a name rather than an
+        // argument, by the same test a subcommand has to pass, and never for
+        // the flags whose value is free text.
+        if let Some(flag) = out.last().filter(|last| last.starts_with('-')) {
+            if !FREE_TEXT.contains(&flag.as_str()) && looks_like_a_subcommand(token) {
+                out.push(token.to_lowercase());
+            }
             continue;
         }
         // Up to two subcommands survive: `cargo build`, `git remote add`.
@@ -119,6 +128,19 @@ pub fn classify_task(description: &str) -> String {
     }
     "other".into()
 }
+
+/// Flags whose value is prose, and therefore different every time.
+///
+/// A commit message kept in a fingerprint would make every commit its own
+/// unique operation, and nothing about committing would ever be learned.
+const FREE_TEXT: &[&str] = &[
+    "-m",
+    "--message",
+    "--msg",
+    "-c",
+    "--comment",
+    "--description",
+];
 
 /// Split on whitespace, keeping quoted runs together.
 fn split(text: &str) -> Vec<String> {
@@ -226,6 +248,41 @@ mod tests {
         assert!(same(
             "C:\\Users\\someone\\.cargo\\bin\\cargo.exe build",
             "cargo build"
+        ));
+    }
+
+    #[test]
+    fn a_flag_value_that_names_the_operation_is_kept() {
+        // The failure that matters most. Two different binaries built by one
+        // command must not merge into one operation, because CoreScout would
+        // then learn a pattern about neither of them.
+        assert!(!same(
+            "cargo run --bin gen-schema",
+            "cargo run --bin server"
+        ));
+        assert_eq!(
+            normalise("cargo run --bin gen-schema"),
+            "cargo run --bin gen-schema"
+        );
+        assert!(!same("npm run build", "npm run dev"));
+    }
+
+    #[test]
+    fn a_flag_value_that_is_merely_an_argument_is_not_kept() {
+        assert!(same(
+            "cargo build --target-dir /tmp/a1b2",
+            "cargo build --target-dir /tmp/9f3c"
+        ));
+        assert!(same("ping -n 60 127.0.0.1", "ping -n 4 127.0.0.1"));
+    }
+
+    #[test]
+    fn a_commit_message_does_not_become_part_of_the_operation() {
+        // Otherwise every commit is its own unique operation and nothing about
+        // committing is ever learned.
+        assert!(same(
+            "git commit -m fixed-the-build",
+            "git commit -m added-a-test"
         ));
     }
 

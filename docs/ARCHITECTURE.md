@@ -1,5 +1,9 @@
 # CoreScout architecture: from benchmark to computational mirror
 
+This describes the research crates and the rules about what each may depend
+on. The layers built on top of them to make a product are in
+[ARCHITECTURE_PRODUCT.md](ARCHITECTURE_PRODUCT.md).
+
 This document records the reclassification of the original CoreScout codebase and
 the reasoning behind the Mirror v0.1 refactor. It is written for whoever picks the
 project up next, including the case where that is a model rather than a person.

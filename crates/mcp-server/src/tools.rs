@@ -91,6 +91,24 @@ impl Tool {
                 },
                 "required": ["session", "name"]
             }),
+            "corescout_before" => json!({
+                "type": "object",
+                "properties": {
+                    "session": {
+                        "type": "string",
+                        "description": "A stable id for your session. The same one you use when                                         reporting the outcome."
+                    },
+                    "operation": {
+                        "type": "string",
+                        "description": "The command you are about to run, or the operation you                                         are about to perform."
+                    },
+                    "workspace": {
+                        "type": "string",
+                        "description": "Optional. The repository or folder."
+                    }
+                },
+                "required": ["session", "operation"]
+            }),
             "corescout_explain" => json!({
                 "type": "object",
                 "properties": {
@@ -232,6 +250,12 @@ pub const TOOLS: &[Tool] = &[
         read_only: true,
     },
     Tool {
+        name: "corescout_before",
+        description: "Ask before you do something: whether this operation has a history on this                       machine, and whether CoreScout has a better way to do it. Call this first                       and report the outcome afterwards with corescout_observe. Sometimes it                       will deliberately not offer its suggestion, because that is how it finds                       out whether the suggestion works.",
+        method: "advise",
+        read_only: false,
+    },
+    Tool {
         name: "corescout_observe",
         description: "Tell CoreScout what you just did and how it went. The field that matters \
                       most is whether you actually verified the result: CoreScout learns from \
@@ -318,10 +342,10 @@ mod tests {
     }
 
     #[test]
-    fn only_the_two_tools_that_change_anything_are_marked_as_such() {
+    fn only_the_tools_that_change_something_are_marked_as_such() {
         // The read-only hint is what a client uses to decide whether to ask
         // the user. Getting it wrong in the permissive direction is the one
-        // that matters.
+        // that matters, so the list is written out rather than counted.
         let writing: Vec<&str> = TOOLS
             .iter()
             .filter(|tool| !tool.read_only)
@@ -329,7 +353,13 @@ mod tests {
             .collect();
         assert_eq!(
             writing,
-            vec!["corescout_observe", "corescout_run_capability"]
+            vec![
+                // Not read-only because it hands out a trial: the assignment
+                // is recorded, and the next report settles it.
+                "corescout_before",
+                "corescout_observe",
+                "corescout_run_capability"
+            ]
         );
     }
 

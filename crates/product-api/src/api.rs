@@ -73,6 +73,10 @@ pub const METHODS: &[(&str, &str)] = &[
         "briefing",
         "What a connecting AI should know about CoreScout",
     ),
+    (
+        "advise",
+        "What to do before an operation, and the trial that goes with it",
+    ),
 ];
 
 /// The dispatcher.
@@ -302,6 +306,12 @@ impl Api {
                     .failures()
                     .iter()
                     .any(|mode| mode.fingerprint == action.fingerprint);
+                // Written now rather than on the next timer tick. An agent
+                // reports an action every few seconds at most, so a
+                // transaction each is cheap, and the alternative is losing the
+                // last twenty seconds of a session every time the service is
+                // killed -- which on a desktop is constantly.
+                engine.persist()?;
                 Ok(json!({
                     "recorded": action.id,
                     "fingerprint": action.fingerprint,
@@ -316,6 +326,13 @@ impl Api {
                         "recorded"
                     },
                 }))
+            }
+            "advise" => {
+                let session = string(params, "session")?;
+                let operation = string(params, "operation")?;
+                let workspace = params.get("workspace").and_then(Value::as_str);
+                let mut engine = self.lock();
+                to_value(&engine.advise(&session, &operation, workspace))
             }
             "goodbye" => {
                 let session = string(params, "session")?;

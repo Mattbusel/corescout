@@ -38,6 +38,16 @@ corescout-analysis = { workspace = true }
 corescout-autonomy = { workspace = true }
 corescout-human = { workspace = true }
 corescout-report = { workspace = true }
+corescout-storage = { workspace = true }
+corescout-permissions = { workspace = true }
+corescout-agent-observation = { workspace = true }
+corescout-agent-experience = { workspace = true }
+corescout-capability-runtime = { workspace = true }
+corescout-product-api = { workspace = true }
+corescout-mcp-server = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = { workspace = true }

@@ -33,6 +33,7 @@ members = [
     "apps/corescout-service",
     "apps/corescout-mcp",
     "apps/corescout-cli",
+    "apps/corescout-demo",
     "integration",
 ]
 

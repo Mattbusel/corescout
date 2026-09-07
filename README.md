@@ -153,12 +153,14 @@ your machine again
 ```
 
 - [PRODUCT.md](docs/PRODUCT.md) — what each screen is for and why it is worded that way
+- [DEMO.md](docs/DEMO.md) — a real trap, built for real, with and without an experienced computer
 - [MCP.md](docs/MCP.md) — the tools your AI gets, and how to connect one
 - [CAPABILITIES.md](docs/CAPABILITIES.md) — how a correlation becomes something runnable
 - [PRIVACY.md](docs/PRIVACY.md) — everything that is stored, and where
 - [SECURITY.md](docs/SECURITY.md) — the boundaries, and how they are enforced
 - [WINDOWS.md](docs/WINDOWS.md) — building, packaging, signing
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — the crate graph and what each layer may not do
+- [ARCHITECTURE_PRODUCT.md](docs/ARCHITECTURE_PRODUCT.md) — the product layers and the rules they follow
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — the research crate graph and what each layer may not do
 
 ## A real machine
 

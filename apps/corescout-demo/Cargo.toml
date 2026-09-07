@@ -1,0 +1,19 @@
+[package]
+name = "corescout-demo"
+description = "The same work, twice, with and without an experienced computer."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "corescout-demo"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+corescout-product-api = { workspace = true }
+corescout-storage = { workspace = true }
