@@ -453,7 +453,10 @@ impl Api {
             // this fail here" much more often than any property of the command,
             // and unlike the counted failure modes they are true on the first
             // occurrence.
-            let machine = engine.environment_faults();
+            let machine = match subject {
+                Some(operation) => engine.environment_faults_for(operation),
+                None => engine.environment_faults(),
+            };
             let matches = |fingerprint: &str| subject.map_or(true, |s| fingerprint.contains(s));
             let relevant: Vec<_> = engine
                 .failures()
@@ -949,6 +952,46 @@ mod tests {
             "{}",
             answer["answer"]
         );
+    }
+
+    #[test]
+    fn an_unrelated_program_is_not_warned_about_another_tools_variable() {
+        // git does not read CARGO_HOME. This was live behaviour before it was
+        // a test: every operation asked about got the same cargo warning.
+        let (_dir, api) = api();
+        let missing = if cfg!(windows) {
+            r"Q:\nowhere\cargo"
+        } else {
+            "/nowhere/at/all/cargo"
+        };
+        api.call(
+            "observe",
+            &json!({
+                "session": "s1",
+                "name": "cargo test -p thing",
+                "reported": "failure",
+                "detail": format!("failed to create directory {missing}. CARGO_HOME={missing}."),
+            }),
+        )
+        .expect("observe");
+
+        let git = api
+            .call(
+                "advise",
+                &json!({"session": "s2", "operation": "git push origin master"}),
+            )
+            .expect("advise");
+        assert_eq!(git["has_advice"], false, "{}", git["because"]);
+        assert!(git["machine"].as_array().map_or(true, |m| m.is_empty()));
+
+        // And cargo still is, or the scoping has thrown the baby out.
+        let cargo = api
+            .call(
+                "advise",
+                &json!({"session": "s2", "operation": "cargo clippy --workspace"}),
+            )
+            .expect("advise");
+        assert_eq!(cargo["has_advice"], true, "{}", cargo["because"]);
     }
 
     #[test]

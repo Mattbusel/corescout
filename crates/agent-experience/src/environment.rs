@@ -43,6 +43,14 @@ pub struct Fault {
     pub variable: Option<String>,
     /// An operation seen to fail this way, for the explanation.
     pub example: String,
+    /// The programs observed to trip over it.
+    ///
+    /// A fault is about the machine, but not about *every* operation on it:
+    /// `git push` does not read `CARGO_HOME`, and warning it about one is the
+    /// false positive that teaches people to ignore warnings. See
+    /// [`Fault::applies_to`].
+    #[serde(default)]
+    pub programs: std::collections::BTreeSet<String>,
     /// How many reports have named it. Not a threshold, only context.
     pub seen: u64,
     /// When it was first reported.
@@ -55,6 +63,36 @@ pub struct Fault {
 }
 
 impl Fault {
+    /// Whether this fault is worth mentioning to a given program.
+    ///
+    /// Two ways to qualify, and both are evidence rather than guesswork. A
+    /// program observed to fail on this path qualifies because it was seen to.
+    /// A program named by the variable qualifies because that is what the
+    /// convention means: `CARGO_HOME` belongs to `cargo`, `PYTHONPATH` to
+    /// `python`, and the prefix is not a coincidence anyone has to infer.
+    ///
+    /// Everything else is told nothing, which costs a true warning only in the
+    /// case where an unrelated program reads another tool's variable. That is
+    /// rare, and the cost of the opposite mistake is every warning being
+    /// ignored.
+    pub fn applies_to(&self, program: &str) -> bool {
+        let program = program.trim().to_lowercase();
+        if program.is_empty() {
+            return false;
+        }
+        if self.programs.contains(&program) {
+            return true;
+        }
+        self.variable.as_deref().is_some_and(|variable| {
+            let owner = variable
+                .split('_')
+                .next()
+                .unwrap_or_default()
+                .to_lowercase();
+            !owner.is_empty() && (program == owner || program.starts_with(&owner))
+        })
+    }
+
     /// A line for an agent about to run into this.
     pub fn headline(&self) -> String {
         match &self.variable {
@@ -93,6 +131,7 @@ impl Environment {
     /// The caller does the finding: this crate holds no opinion about the
     /// filesystem, and a test that had to create drives would test nothing.
     pub fn record(&mut self, candidate: &Blamed, example: &str, now_ms: u64) -> &Fault {
+        let program = program_of(example);
         let fault = self
             .faults
             .entry(candidate.path.to_lowercase())
@@ -100,6 +139,7 @@ impl Environment {
                 path: candidate.path.clone(),
                 variable: candidate.variable.clone(),
                 example: example.to_string(),
+                programs: std::collections::BTreeSet::new(),
                 seen: 0,
                 first_ms: now_ms,
                 last_ms: now_ms,
@@ -109,6 +149,9 @@ impl Environment {
         // the more specific of the two costs nothing and reads better.
         if fault.variable.is_none() {
             fault.variable = candidate.variable.clone();
+        }
+        if !program.is_empty() {
+            fault.programs.insert(program);
         }
         fault.seen += 1;
         fault.last_ms = now_ms;
@@ -125,6 +168,16 @@ impl Environment {
     /// Every fault held, whether or not it is still true.
     pub fn all(&self) -> impl Iterator<Item = &Fault> {
         self.faults.values()
+    }
+
+    /// The faults worth telling one operation about.
+    pub fn for_operation(&self, operation: &str) -> Vec<Fault> {
+        let program = program_of(operation);
+        self.faults
+            .values()
+            .filter(|fault| fault.applies_to(&program))
+            .cloned()
+            .collect()
     }
 
     /// Drop the ones that are no longer missing.
@@ -155,6 +208,18 @@ impl Environment {
     pub fn is_empty(&self) -> bool {
         self.faults.is_empty()
     }
+}
+
+/// The program an operation runs, lowercased.
+///
+/// The fingerprint has already been normalised by the time this sees it, so
+/// the first token is the program and nothing has to be stripped.
+pub fn program_of(operation: &str) -> String {
+    operation
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_lowercase()
 }
 
 /// Read a failure message for paths it blames.
@@ -316,6 +381,46 @@ mod tests {
         environment.record(&candidates(REAL)[0], "cargo test", 1);
         assert!(environment.resolve(|_| false).is_empty());
         assert_eq!(environment.len(), 1);
+    }
+
+    #[test]
+    fn a_fault_is_not_mentioned_to_a_program_that_cannot_hit_it() {
+        // Found by using the thing: git push was being warned about
+        // CARGO_HOME. Git does not read CARGO_HOME, and a warning that fires
+        // on everything is a warning nobody reads.
+        let mut environment = Environment::default();
+        environment.record(&candidates(REAL)[0], "cargo test", 1);
+        assert!(environment
+            .for_operation("git push origin master")
+            .is_empty());
+        assert!(environment.for_operation("npm run build").is_empty());
+        assert!(!environment
+            .for_operation("cargo build --release")
+            .is_empty());
+    }
+
+    #[test]
+    fn the_variable_says_who_it_belongs_to() {
+        // cargo was the program that failed, but clippy and fmt are invoked as
+        // cargo too, and the prefix is the convention rather than a guess.
+        let mut environment = Environment::default();
+        environment.record(&candidates(REAL)[0], "cargo test", 1);
+        let fault = environment.all().next().expect("the fault").clone();
+        assert!(fault.applies_to("cargo"));
+        assert!(!fault.applies_to("git"));
+        assert!(!fault.applies_to(""));
+    }
+
+    #[test]
+    fn a_program_seen_to_fail_qualifies_even_without_a_variable() {
+        let mut environment = Environment::default();
+        let blamed = Blamed {
+            path: "/nowhere/lib".into(),
+            variable: None,
+        };
+        environment.record(&blamed, "mytool build", 1);
+        assert!(!environment.for_operation("mytool test").is_empty());
+        assert!(environment.for_operation("git push").is_empty());
     }
 
     #[test]

@@ -368,6 +368,19 @@ impl Engine {
         self.experience.environment.all().cloned().collect()
     }
 
+    /// The machine faults an operation could actually trip over.
+    ///
+    /// Warning `git push` about `CARGO_HOME` is worse than saying nothing: a
+    /// warning that fires on everything is one nobody reads, and that costs the
+    /// warnings that are real.
+    pub fn environment_faults_for(
+        &mut self,
+        operation: &str,
+    ) -> Vec<corescout_agent_experience::Fault> {
+        self.environment_faults();
+        self.experience.environment.for_operation(operation)
+    }
+
     /// Read a failed action for a machine fault, and remember any that is real.
     ///
     /// Called on the observe path. The filesystem check happens here, once, at
@@ -731,8 +744,9 @@ impl Engine {
         let fingerprint = corescout_agent_observation::fingerprint::normalise(operation);
         // Asked for before anything about the operation, because a machine
         // fault outranks everything else here: there is no point suggesting a
-        // better way to run something that cannot run at all.
-        let machine = self.environment_faults();
+        // better way to run something that cannot run at all. Scoped to the
+        // program, so this stays a warning worth reading.
+        let machine = self.environment_faults_for(&fingerprint);
         // Identified here too, so a hook that reported a folder and an agent
         // that asks about the same folder are talking about one workspace.
         let identified = workspace.map(workspace_id);
