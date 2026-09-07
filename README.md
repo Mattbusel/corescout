@@ -226,6 +226,29 @@ pwsh scripts/release.ps1     # installers into dist/
 The desktop shell is deliberately outside the Cargo workspace, so the tests
 above still run in seconds.
 
+## Privacy Policy
+
+CoreScout is local-first. Everything it records stays in
+`%LOCALAPPDATA%\CoreScout\` on the machine that produced it.
+
+- **Collected.** Processor layout and live performance counters; the commands
+  and tool calls AI clients make, with credentials stripped as the data enters;
+  exit codes, durations, retries, and whether anything verified the result;
+  the folder each piece of work happened in; when each AI session ran.
+- **Never collected.** The contents of your source files, your prompts, model
+  responses, and any token, key or password.
+- **Used for.** Forming and testing theories about how this machine behaves, so
+  the AI tools connected to it can be told what has failed here before and what
+  has been verified. Nothing else.
+- **Shared with third parties.** Nothing. There is no network endpoint to share
+  it with: no crate in this project opens an outbound connection.
+- **Retention.** Kept until you delete it. The application deletes any category
+  of it on request, and removing `%LOCALAPPDATA%\CoreScout\` removes all of
+  it; CoreScout then starts again from nothing.
+- **Contact.** https://github.com/mattbusel/corescout/issues
+
+Full policy: <https://corescout.vercel.app/privacy>
+
 ## Licence
 
 MIT or Apache-2.0, at your option.

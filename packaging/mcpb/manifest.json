@@ -1,0 +1,59 @@
+{
+  "manifest_version": "0.3",
+  "name": "corescout",
+  "display_name": "CoreScout",
+  "version": "1.0.0",
+  "description": "Operational memory for the machine your AI works on: what fails here, what has been verified, and what state the computer is in.",
+  "long_description": "CoreScout observes this computer and what AI tools do to it, notices what recurs, and tests the promising patterns under randomised assignment before it claims a cause. Claude can ask it what has failed here before, whether a verified procedure exists for an operation, and whether the machine is in an unusual state, and can report outcomes back so the next session starts from what this one learned.\n\nEverything stays on the machine. There is no account, no server and no telemetry: the extension bundles the CoreScout service and talks to it over a loopback socket guarded by a token only your account can read.",
+  "author": {
+    "name": "Tensorust",
+    "url": "https://github.com/mattbusel/corescout"
+  },
+  "homepage": "https://corescout.vercel.app",
+  "documentation": "https://github.com/mattbusel/corescout/blob/master/docs/MCP.md",
+  "support": "https://github.com/mattbusel/corescout/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mattbusel/corescout"
+  },
+  "icon": "icon.png",
+  "license": "MIT OR Apache-2.0",
+  "keywords": ["observability", "memory", "machine", "local-first", "agents"],
+  "privacy_policies": ["https://corescout.vercel.app/privacy"],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/corescout-mcp.exe",
+    "mcp_config": {
+      "command": "${__dirname}/server/corescout-mcp",
+      "args": [],
+      "env": {},
+      "platform_overrides": {
+        "win32": {
+          "command": "${__dirname}/server/corescout-mcp.exe"
+        }
+      }
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["win32"]
+  },
+  "tools_generated": false,
+  "tools": [
+    { "name": "corescout_status", "description": "Is CoreScout running, what is connected to it, and how much it has seen." },
+    { "name": "corescout_briefing", "description": "What CoreScout is, what it currently knows, and what it will and will not do in its present mode." },
+    { "name": "corescout_knowledge", "description": "Everything this computer has learned, grouped by AI tool, repository and machine." },
+    { "name": "corescout_current_state", "description": "What the machine is doing right now, and whether that state is one CoreScout recognises." },
+    { "name": "corescout_machine", "description": "What this computer physically is, and what CoreScout can observe of it." },
+    { "name": "corescout_learned", "description": "Learned findings as cards, each marked correlation or measured effect." },
+    { "name": "corescout_failures", "description": "Operations that recur and go wrong on this machine, with how often and how they fail." },
+    { "name": "corescout_capabilities", "description": "Procedures CoreScout has verified and the user has approved." },
+    { "name": "corescout_hypotheses", "description": "What CoreScout is currently testing and cannot yet answer." },
+    { "name": "corescout_ask", "description": "Ask CoreScout what it knows about a repository, an operation, or the machine's current state." },
+    { "name": "corescout_explain", "description": "Why CoreScout believes one thing: the evidence and how it was obtained." },
+    { "name": "corescout_recent_activity", "description": "What has happened recently, as CoreScout recorded it." },
+    { "name": "corescout_before", "description": "Check before an operation: its history here, and whether a better way is known." },
+    { "name": "corescout_observe", "description": "Report what you just did and how it went, including whether you verified the result." },
+    { "name": "corescout_run_capability", "description": "Run a verified capability, subject to the user's autonomy mode and permissions." }
+  ]
+}

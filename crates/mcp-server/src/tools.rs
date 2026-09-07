@@ -19,12 +19,16 @@ use serde_json::{json, Value};
 pub struct Tool {
     /// The name an agent calls.
     pub name: &'static str,
+    /// A short human-readable label, shown in clients that list tools.
+    pub title: &'static str,
     /// What it does, written for a model deciding whether to call it.
     pub description: &'static str,
     /// The product API method it becomes.
     pub method: &'static str,
     /// Whether it only reads.
     pub read_only: bool,
+    /// Whether a call can change something the user would mind losing.
+    pub destructive: bool,
 }
 
 impl Tool {
@@ -165,112 +169,142 @@ impl Tool {
 pub const TOOLS: &[Tool] = &[
     Tool {
         name: "corescout_status",
+        title: "Check CoreScout status",
         description: "Is CoreScout running, what is connected to it, and how much it has seen. \
                       Cheap; call it first if you are unsure whether CoreScout is available.",
         method: "status",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_briefing",
+        title: "Read the CoreScout briefing",
         description: "What CoreScout is, what it currently knows, and what it will and will not \
                       do in its present mode. Read this before relying on anything else here.",
         method: "briefing",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_knowledge",
+        title: "List what this computer has learned",
         description: "Everything this computer has learned, grouped: about the AI tools that \
                       have worked here, about the repositories, about the machine, and what it \
                       is still uncertain about.",
         method: "knowledge",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_current_state",
+        title: "Read the machine's current state",
         description: "What the machine is doing right now, and whether this is a way of running \
                       CoreScout recognises. An unfamiliar state means everything else CoreScout \
                       tells you is weaker than usual.",
         method: "live",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_machine",
+        title: "Describe this computer",
         description: "What this computer physically is, and what CoreScout can observe of it.",
         method: "computer",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_learned",
+        title: "List learned findings",
         description: "Everything CoreScout has learned, as cards. Each one says whether it is a \
                       correlation it has merely observed or an effect it measured under \
                       randomised assignment. Check which before acting on one.",
         method: "learned",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_failures",
+        title: "List recurring failures",
         description: "Operations that recur and go wrong on this machine, with how often and how \
                       they fail. Ask before attempting something that has a history here.",
         method: "failures",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_capabilities",
+        title: "List verified capabilities",
         description: "Procedures CoreScout has verified and the user has approved. Prefer one of \
                       these over doing the same thing by hand.",
         method: "capabilities",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_hypotheses",
+        title: "List open hypotheses",
         description: "What CoreScout is currently testing and cannot yet answer, and what \
                       evidence each is missing.",
         method: "hypotheses",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_ask",
+        title: "Ask CoreScout a question",
         description: "Ask CoreScout what it knows about something: a repository, an operation, \
                       the machine's current state. Answers carry their evidence and their \
                       confidence.",
         method: "ask",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_explain",
+        title: "Explain a CoreScout belief",
         description: "Why CoreScout believes one thing: the evidence, whether it is randomised \
                       or merely observed, the alternative it considered, and what happened.",
         method: "explain",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_recent_activity",
+        title: "List recent activity",
         description: "What has happened recently, as CoreScout recorded it.",
         method: "activity",
         read_only: true,
+        destructive: false,
     },
     Tool {
         name: "corescout_before",
+        title: "Check before an operation",
         description: "Ask before you do something: whether this operation has a history on this                       machine, and whether CoreScout has a better way to do it. Call this first                       and report the outcome afterwards with corescout_observe. Sometimes it                       will deliberately not offer its suggestion, because that is how it finds                       out whether the suggestion works.",
         method: "advise",
         read_only: false,
+        destructive: false,
     },
     Tool {
         name: "corescout_observe",
+        title: "Report an outcome to CoreScout",
         description: "Tell CoreScout what you just did and how it went. The field that matters \
                       most is whether you actually verified the result: CoreScout learns from \
                       the gap between what a tool reports and what turns out to be true. Report \
                       failures and retries too; those are the useful ones.",
         method: "observe",
         read_only: false,
+        destructive: false,
     },
     Tool {
         name: "corescout_run_capability",
+        title: "Run a verified capability",
         description: "Run a verified capability. Subject to the user's autonomy mode and \
                       permissions: it may be refused, or held for approval, and the reply says \
                       which. Try it with dry_run first.",
         method: "run",
         read_only: false,
+        destructive: true,
     },
 ];
 
@@ -289,7 +323,9 @@ pub fn describe() -> Vec<Value> {
                 "description": tool.description,
                 "inputSchema": tool.schema(),
                 "annotations": {
+                    "title": tool.title,
                     "readOnlyHint": tool.read_only,
+                    "destructiveHint": tool.destructive,
                     "openWorldHint": false,
                 },
             })
@@ -415,7 +451,9 @@ mod tests {
         for entry in &described {
             assert!(entry["name"].is_string());
             assert!(entry["inputSchema"]["type"] == "object");
+            assert!(entry["annotations"]["title"].is_string());
             assert!(entry["annotations"]["readOnlyHint"].is_boolean());
+            assert!(entry["annotations"]["destructiveHint"].is_boolean());
         }
     }
 }
