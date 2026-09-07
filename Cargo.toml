@@ -43,7 +43,7 @@ members = [
 exclude = ["apps/corescout-desktop/src-tauri"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT OR Apache-2.0"

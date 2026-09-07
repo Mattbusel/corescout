@@ -1,0 +1,33 @@
+[package]
+name = "corescout-desktop"
+description = "CoreScout for Windows."
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.77"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mattbusel/corescout"
+
+# Deliberately not a member of the workspace. Tauri's dependency tree is an
+# order of magnitude larger than everything else here, and keeping it out means
+# `cargo test` at the root still runs in seconds, which is the difference
+# between gates that get run and gates that get skipped.
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+corescout-product-api = { path = "../../../crates/product-api" }
+corescout-storage = { path = "../../../crates/storage" }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

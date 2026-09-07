@@ -34,8 +34,14 @@ pub const SAMPLE_BYTES: usize = 64;
 pub const HEADER_BYTES: u64 = 64;
 /// A magic number, so a truncated or foreign file is refused, not parsed.
 const MAGIC: [u8; 8] = [b'C', b'S', b'R', b'I', b'N', b'G', 0, 1];
-/// Samples kept by default: at one every 200 ms, about seven days.
-pub const DEFAULT_CAPACITY: u64 = 3_000_000;
+/// Samples kept by default.
+///
+/// 32 MiB, allocated in full when the file is created rather than grown into,
+/// so the number on the Privacy page is the number forever. At four samples a
+/// second that is about a day and a half of history at full resolution, which
+/// is what a chart needs; anything older is a question for the document store,
+/// which keeps what was learned rather than every reading behind it.
+pub const DEFAULT_CAPACITY: u64 = 512 * 1024;
 /// Aggregate features carried per sample.
 pub const FEATURES: usize = 6;
 

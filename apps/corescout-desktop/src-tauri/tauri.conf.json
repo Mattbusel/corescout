@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CoreScout",
+  "version": "0.3.0",
+  "identifier": "dev.corescout.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5183",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "CoreScout",
+        "width": 1080,
+        "height": 760,
+        "minWidth": 880,
+        "minHeight": 600,
+        "resizable": true,
+        "center": true,
+        "decorations": true,
+        "theme": null
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+    },
+    "trayIcon": {
+      "id": "corescout",
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": false
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/corescout-service",
+      "binaries/corescout-mcp",
+      "binaries/corescout"
+    ],
+    "publisher": "CoreScout",
+    "copyright": "MIT OR Apache-2.0",
+    "category": "DeveloperTool",
+    "shortDescription": "Your computer, learning how to work with your AI.",
+    "longDescription": "CoreScout watches how this computer and your AI work together, remembers what reality teaches them, and turns useful discoveries into better ways of working. Everything stays on this machine.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": ["en-US"]
+      }
+    }
+  }
+}

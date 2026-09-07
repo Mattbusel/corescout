@@ -294,10 +294,19 @@ impl Api {
                 }
                 let mut engine = self.lock();
                 let action = engine.agent_observe(&raw);
+                // `recurring_failure_here` is a fact about history; `failed` is
+                // a fact about this one action. Reporting the second under a
+                // name that sounds like the first is how an agent comes to
+                // believe CoreScout knows more than it does.
+                let recurring = engine
+                    .failures()
+                    .iter()
+                    .any(|mode| mode.fingerprint == action.fingerprint);
                 Ok(json!({
                     "recorded": action.id,
                     "fingerprint": action.fingerprint,
-                    "known_failure_mode": action.visibly_failed(),
+                    "failed": action.visibly_failed(),
+                    "recurring_failure_here": recurring,
                     "note": if action.is_silent_failure() {
                         "CoreScout recorded this as a silent failure: it reported success and \
                          something contradicted it."

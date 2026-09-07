@@ -1,3 +1,16 @@
 /target
 **/*.rs.bk
 *.pdb
+
+# Frontend build output and dependencies
+node_modules/
+dist/
+.next/
+out/
+apps/corescout-desktop/dist/
+apps/corescout-desktop/src-tauri/target/
+apps/corescout-desktop/src-tauri/gen/
+# Sidecar copies, produced by scripts/release.ps1 from target/release
+apps/corescout-desktop/src-tauri/binaries/
+web/website/.next/
+web/website/out/

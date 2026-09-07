@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/*
+ * The same design system as the application.
+ *
+ * These tokens are the ones in apps/corescout-desktop/src/theme.css, expressed
+ * where Tailwind can reach them. Keeping the two in step by hand is a real
+ * cost and the right one: the alternative is a shared package that both build
+ * systems have to agree about, for eleven colours.
+ */
+
+@theme {
+  --color-paper: #fbfbfa;
+  --color-raised: #ffffff;
+  --color-sunken: #f4f4f2;
+  --color-ink: #16161a;
+  --color-ink-soft: #46464f;
+  --color-ink-muted: #77777f;
+  --color-ink-faint: #a3a3aa;
+  --color-line: #e6e6e2;
+  --color-line-strong: #d6d6d1;
+
+  --color-accent: #1f6f5c;
+  --color-accent-soft: #e6f1ee;
+
+  --color-verified: #1f6f5c;
+  --color-verified-soft: #e6f1ee;
+  --color-observed: #7a6a3f;
+  --color-observed-soft: #f4efe2;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system,
+    BlinkMacSystemFont, Inter, system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo,
+    monospace;
+
+  --ease-calm: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+:root {
+  color-scheme: light;
+  --paper: var(--color-paper);
+  --ink: var(--color-ink);
+  --line: var(--color-line);
+  --accent: var(--color-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --color-paper: #0e0e11;
+    --color-raised: #16161a;
+    --color-sunken: #121216;
+    --color-ink: #f2f2f0;
+    --color-ink-soft: #c2c2c8;
+    --color-ink-muted: #8b8b95;
+    --color-ink-faint: #5e5e68;
+    --color-line: #232329;
+    --color-line-strong: #32323a;
+    --color-accent: #5cc3a5;
+    --color-accent-soft: #16302a;
+    --color-verified: #5cc3a5;
+    --color-verified-soft: #16302a;
+    --color-observed: #c5ab6d;
+    --color-observed-soft: #2a2519;
+    --paper: var(--color-paper);
+    --ink: var(--color-ink);
+    --line: var(--color-line);
+    --accent: var(--color-accent);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+/* One shared entrance. Everything that appears on scroll uses it, so the whole
+   page moves the same way rather than in six different ones. */
+.rise {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: rise 620ms var(--ease-calm) forwards;
+}
+
+@keyframes rise {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hairline {
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .rise {
+    opacity: 1;
+    transform: none;
+  }
+}
