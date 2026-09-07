@@ -27,11 +27,11 @@ is a test asserting it.
 
 ## 2. The machine described itself
 
-`corescout info` on real hardware got the asymmetric cache hierarchy right
+`corescout-lab info` on real hardware got the asymmetric cache hierarchy right
 without being told: P-cores 48 KiB L1d and 2 MiB L2 per pair, E-cores 32 KiB L1d
 in clusters of four sharing 4 MiB L2, 30 MiB L3 across all 24.
 
-`corescout mirror --once`: 86 entities x 9 channels, **6.8 microseconds** per
+`corescout-lab mirror --once`: 86 entities x 9 channels, **6.8 microseconds** per
 observation pass.
 
 Its own account of itself, from 900 reflections over 36 seconds:
@@ -304,7 +304,7 @@ corescout diagnostics
 ### An honest correction to a number this project has quoted
 
 Earlier sections report an observation pass at **6.8 microseconds**. That is
-`corescout mirror --once` in a tight loop, with warm caches, and it is a true
+`corescout-lab mirror --once` in a tight loop, with warm caches, and it is a true
 measurement of that.
 
 The number the product actually pays is **70 microseconds**, measured as the

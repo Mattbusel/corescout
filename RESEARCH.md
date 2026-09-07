@@ -261,7 +261,7 @@ without finding absent structure.
 
 What it does not establish: anything about real hardware. The simulator makes SMT
 siblings covary by construction. **The open half of this question is one hour of
-`corescout mirror --record` on a real machine.**
+`corescout-lab mirror --record` on a real machine.**
 
 Two things that will be different there, and are worth predicting in advance so
 the result can be a surprise:

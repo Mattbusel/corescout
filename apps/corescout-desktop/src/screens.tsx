@@ -9,9 +9,13 @@
  * AI kept failing at something.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   call,
+  inShell,
+  launchAtLogin,
+  revealDataFolder,
+  setLaunchAtLogin,
   type Agent,
   type Card,
   type Diagnostics,
@@ -586,6 +590,59 @@ export function Computer() {
   );
 }
 
+/**
+ * Starting when the user signs in.
+ *
+ * Off unless asked. A product that adds itself to startup without being asked
+ * has made a decision that was not its to make, and this switch reads its real
+ * state from the registry rather than remembering what it last set.
+ */
+function StartAtLogin() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void launchAtLogin().then((value) => {
+      if (alive) setOn(value);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!inShell()) return null;
+
+  return (
+    <div className="card">
+      <div className="spread">
+        <div>
+          <h3>Start CoreScout when I sign in</h3>
+          <p className="faint">
+            {on
+              ? "Your computer keeps learning from the moment you log in. You can also remove this in Task Manager, under Startup."
+              : "CoreScout only runs while you have it open. It will not learn anything in between."}
+          </p>
+        </div>
+        <button
+          className={`action${on ? "" : " primary"}`}
+          onClick={async () => {
+            try {
+              setOn(await setLaunchAtLogin(!on));
+              setProblem(null);
+            } catch (error) {
+              setProblem(String(error));
+            }
+          }}
+        >
+          {on === null ? "Checking…" : on ? "Turn off" : "Turn on"}
+        </button>
+      </div>
+      {problem ? <p style={{ color: "var(--stop)" }}>{problem}</p> : null}
+    </div>
+  );
+}
+
 function Knows({
   title,
   lines,
@@ -699,6 +756,11 @@ export function Settings({ status }: { status: Status | null }) {
               for you.
             </p>
           </div>
+
+          <div className="section">
+            <h2>Starting up</h2>
+            <StartAtLogin />
+          </div>
         </>
       ) : null}
 
@@ -717,6 +779,11 @@ export function Settings({ status }: { status: Status | null }) {
                 <Badge kind={privacy.data.telemetry ? "warn" : "verified"}>
                   {privacy.data.telemetry ? "telemetry on" : "no telemetry"}
                 </Badge>
+                {inShell() ? (
+                  <button className="action" onClick={() => void revealDataFolder()}>
+                    Open the folder
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>

@@ -1,0 +1,92 @@
+name: gates
+
+# Everything this repository promises, checked on every push.
+#
+# The desktop shell is built separately and only on Windows: it is the one
+# place a browser engine and a bundler are involved, and keeping it out of the
+# main job means a broken frontend does not hide a broken crate.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: rust on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is the product platform. Linux is where the mirror's other
+        # backend lives, and running there catches the class of mistake that
+        # only shows up when a `cfg` is wrong.
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+
+      - name: formatting
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: tests
+        run: cargo test --workspace
+
+      - name: documentation
+        run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      # The tests that inspect what a user actually receives. They need the
+      # release profile, so they run after it is built and not before.
+      - name: release artefacts
+        if: runner.os == 'Windows'
+        run: |
+          cargo build --release -p corescout-service -p corescout-cli -p corescout-mcp
+          cargo test -p corescout-integration --test installed -- --ignored
+
+  frontend:
+    name: desktop frontend
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/corescout-desktop/package-lock.json
+      - run: npm ci
+        working-directory: apps/corescout-desktop
+      - run: npm run typecheck
+        working-directory: apps/corescout-desktop
+      - run: npm test
+        working-directory: apps/corescout-desktop
+      - run: npm run build
+        working-directory: apps/corescout-desktop
+
+  website:
+    name: website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/website/package-lock.json
+      - run: npm ci
+        working-directory: web/website
+      - run: npm run typecheck
+        working-directory: web/website
+      - run: npm run build
+        working-directory: web/website

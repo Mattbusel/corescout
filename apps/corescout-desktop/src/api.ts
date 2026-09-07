@@ -57,6 +57,21 @@ export async function shell(command: string, args: Record<string, unknown> = {})
   return invoke(command, args);
 }
 
+/** Whether CoreScout starts when this user signs in. */
+export async function launchAtLogin(): Promise<boolean> {
+  return Boolean(await shell("launch_at_login"));
+}
+
+/** Turn starting at sign-in on or off, and report what it ended up as. */
+export async function setLaunchAtLogin(enabled: boolean): Promise<boolean> {
+  return Boolean(await shell("set_launch_at_login", { enabled }));
+}
+
+/** Open the folder CoreScout keeps its data in. */
+export async function revealDataFolder(): Promise<void> {
+  await shell("reveal_data_folder");
+}
+
 /* --------------------------------------------------------------- shapes */
 
 export interface Status {

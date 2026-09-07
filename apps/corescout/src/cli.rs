@@ -21,10 +21,13 @@ use corescout_experiment::benchmarks::RunConfig;
 use corescout_human::Format;
 
 pub const USAGE: &str = "\
-corescout - a machine that observes itself, models itself, and acts on itself
+corescout-lab - a machine that observes itself, models itself, and acts on itself
 
 USAGE:
-    corescout <COMMAND> [OPTIONS]
+    corescout-lab <COMMAND> [OPTIONS]
+
+This is the research command line: every experiment the documents in docs/
+refer to. The product one is `corescout`.
 
 OBSERVING (passive; changes nothing)
     mirror                  Observe continuously and publish the self-state plane

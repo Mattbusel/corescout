@@ -14,3 +14,5 @@ apps/corescout-desktop/src-tauri/gen/
 apps/corescout-desktop/src-tauri/binaries/
 web/website/.next/
 web/website/out/
+# Release artefacts, produced by scripts/release.ps1
+dist/

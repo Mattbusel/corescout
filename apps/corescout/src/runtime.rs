@@ -60,7 +60,7 @@ pub fn open_source(options: &SourceOptions) -> Result<Source> {
             let path = default_path();
             if !path.exists() {
                 return Err(Error::invalid(format!(
-                    "no self-state plane at {}; start one with `corescout mirror`, \
+                    "no self-state plane at {}; start one with `corescout-lab mirror`, \
                      or read a recording with --source <trace>",
                     path.display()
                 )));
@@ -114,7 +114,7 @@ pub fn to_json<T: serde::Serialize>(value: &T) -> Result<String> {
 /// Print an error the way a command line tool should: to stderr, prefixed, and
 /// without a stack trace.
 pub fn report_error(error: &Error) {
-    eprintln!("corescout: {error}");
+    eprintln!("corescout-lab: {error}");
     if let Error::Io { path, source } = error {
         if source.kind() == std::io::ErrorKind::PermissionDenied {
             eprintln!(
@@ -148,7 +148,7 @@ mod tests {
         };
         if !default_path().exists() {
             let error = open_source(&options).unwrap_err().to_string();
-            assert!(error.contains("corescout mirror"), "{error}");
+            assert!(error.contains("corescout-lab mirror"), "{error}");
         }
     }
 

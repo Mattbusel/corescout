@@ -7,6 +7,9 @@ This is the primitive CoreScout was built on, and the part of the project that
 came first. If you are looking for the product, start with the
 [README](../README.md); this document is what is underneath it.
 
+The commands below are `corescout-lab`, the research command line. `corescout`
+is the product one; `corescout-lab --help` lists everything here.
+
 CoreScout continuously observes a machine's own hardware and publishes the result
 as a numeric matrix in shared memory. Other software maps that region read-only
 and reads the machine's current state at memory speed, without parsing `/proc`,
@@ -195,7 +198,7 @@ No parsing, no allocation, no syscall.
 cargo build --release
 
 # Publish the mirror. Passive: it reads what the kernel already maintains.
-./target/release/corescout mirror
+./target/release/corescout-lab mirror
 
 # Learn from it, with no hardware access at all.
 ./target/release/mirror-observer --both
@@ -208,7 +211,7 @@ cargo build --release
 ./target/release/mirror-inspect --watch 10            # liveness and read cost
 
 # One reflection, no plane, for a quick look:
-./target/release/corescout mirror --once
+./target/release/corescout-lab mirror --once
 ```
 
 ```text
@@ -270,7 +273,7 @@ this by reading its source.
 
 ```bash
 # Record an hour of reflections.
-corescout mirror --record trace.jsonl --interval 100 --ticks 36000
+corescout-lab mirror --record trace.jsonl --interval 100 --ticks 36000
 
 # Two observers over identical data. One sees the mirror's names; one sees
 # entity_7, x2 and edge_type_2.
@@ -377,14 +380,14 @@ is evidence that:
   to consumer,
 - and the two lenses can be compared on identical data.
 
-**The real experiment is an hour of `corescout mirror --record` on real hardware,
+**The real experiment is an hour of `corescout-lab mirror --record` on real hardware,
 followed by exactly this analysis.** It has not been run. The simulator exists so
 the harness could be checked against a machine whose answers are known first.
 
 ### The original tool is still here
 
 ```bash
-corescout info                                   # topology
+corescout-lab info                                   # topology
 corescout benchmark                              # per-core measurement
 corescout analyze                                # ranking and pin recommendations
 corescout run --profile latency -- ./my_program  # launch pinned
@@ -791,15 +794,15 @@ Nothing runs system-wide. There is no daemon that tunes your machine.
 
 ```text
 OBSERVING (passive; changes nothing)
-  corescout mirror                    publish the self-state plane
-  corescout record trace.jsonl        append every reflection to a trace
-  corescout info                      topology, caches, SMT, NUMA
+  corescout-lab mirror                    publish the self-state plane
+  corescout-lab record trace.jsonl        append every reflection to a trace
+  corescout-lab info                      topology, caches, SMT, NUMA
 
 READING THE MIRROR (no hardware access at all)
   corescout inspect                   describe the live plane
   corescout replay trace.jsonl        read a recording as though it were live
-  corescout observe --both            the two-ontology experiment
-  corescout learn                     learn to predict, and score it
+  corescout-lab observe --both            the two-ontology experiment
+  corescout-lab learn                     learn to predict, and score it
   corescout latent                    the states the machine found in itself
   corescout describe                  what it can truthfully say about itself
 
@@ -810,10 +813,10 @@ PERTURBING (deliberately changes the machine)
   corescout experiment compare        the baseline comparison
 
 ACTING (bounded, reversible, audited)
-  corescout agent start --dry-run     the decision loop, changing nothing
-  corescout agent start --intent latency-critical
+  corescout-lab agent start --dry-run     the decision loop, changing nothing
+  corescout-lab agent start --intent latency-critical
 
-  corescout demo self                 the whole cycle, then an explanation
+  corescout-lab demo self                 the whole cycle, then an explanation
 ```
 
 ## Project layout
