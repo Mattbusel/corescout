@@ -38,6 +38,28 @@ use corescout_substrate::platform::{self, Platform};
 const ITERATIONS: u32 = 60;
 const WARMUP: u32 = 6;
 
+/// Every measurement in this file takes this before touching the machine.
+///
+/// # Why a mutex and not a flag
+///
+/// These tests spawn pinned load and then measure how fast a core is. Run two
+/// at once and each one's disturbance lands in the other's baseline, which is
+/// not a flaky test: it is the apparatus being part of the machine it is
+/// measuring. The first run of this file, in parallel, reported SMT contention
+/// as 1% and two identical cores as 30% apart, both nonsense.
+///
+/// `--test-threads=1` would also fix it and can be forgotten. A lock cannot.
+static MACHINE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Take the machine, tolerating a previous test having panicked while holding
+/// it. A poisoned lock here means an earlier measurement failed, not that this
+/// one cannot proceed.
+fn exclusive() -> std::sync::MutexGuard<'static, ()> {
+    MACHINE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Every single-CPU placement this process may use.
 fn placements(platform: &dyn Platform) -> Vec<(String, CpuSet)> {
     let permitted = platform
@@ -72,6 +94,7 @@ fn measure(
 
 #[test]
 fn this_machine_has_placements_that_differ_and_the_difference_is_measurable() {
+    let _machine = exclusive();
     // Before anything can be learned there has to be something to learn. On a
     // uniform part this legitimately finds nothing, and says so.
     let platform = platform::detect();
@@ -129,6 +152,7 @@ fn this_machine_has_placements_that_differ_and_the_difference_is_measurable() {
 
 #[test]
 fn a_causal_effect_of_placement_is_established_from_randomised_trials_only() {
+    let _machine = exclusive();
     // The claim class that needs intervention. Every trial here is assigned by
     // coin flip, so the comparison is between two things the machine was made
     // to do rather than two things it happened to do.
@@ -184,6 +208,7 @@ fn a_causal_effect_of_placement_is_established_from_randomised_trials_only() {
 
 #[test]
 fn observational_evidence_from_this_machine_still_supports_no_causal_claim() {
+    let _machine = exclusive();
     // The rule, on real data. A hundred trials that were all chosen rather than
     // assigned establish nothing, however large the difference between them.
     let platform = platform::detect();
@@ -224,6 +249,7 @@ fn observational_evidence_from_this_machine_still_supports_no_causal_claim() {
 
 #[test]
 fn work_that_is_not_done_is_caught_on_real_hardware() {
+    let _machine = exclusive();
     // The anti-fraud property, live. A trial checked against the wrong reference
     // must report itself unverified rather than fast.
     let platform = platform::detect();
@@ -251,6 +277,7 @@ fn work_that_is_not_done_is_caught_on_real_hardware() {
 
 #[test]
 fn productivity_of_this_machine_is_measured_with_verified_work() {
+    let _machine = exclusive();
     // Q on real silicon: verified iterations per cycle, with unverified work
     // worth nothing and still charged.
     let platform = platform::detect();
@@ -288,6 +315,7 @@ fn productivity_of_this_machine_is_measured_with_verified_work() {
 
 #[test]
 fn report_the_real_machine() {
+    let _machine = exclusive();
     // The headline. Printed rather than asserted, because what this machine
     // turns out to be is a fact about it and not something to require.
     let platform = platform::detect();

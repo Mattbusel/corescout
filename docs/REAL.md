@@ -149,7 +149,68 @@ i7-13700KF, a placement search costs cycles and returns nothing.**
 
 ---
 
-## 6. The theory engine's alarm fired on its first real run
+## 6. Correlation invents a difference that is not there
+
+The credulity traps, rebuilt from real contention instead of a formula.
+
+**The confounder is physical.** `cpu0` and `cpu1` are the two threads of one
+core and share its execution resources. A thread pinned to `cpu1` running a
+dependent arithmetic chain makes `cpu0` measurably slower:
+
+```text
+cpu0 costs 65927072 cycles with its sibling cpu1 idle,
+           87190787 with it busy: 32% slower
+```
+
+**The two placements compared are interchangeable.** Two P-cores, measured
+undisturbed and interleaved: **0.0% apart**. There is no difference to find.
+
+**The trap is aliasing.** Both siblings follow one schedule, so neither core is
+favoured and each is contended for exactly half the run. The sampler alternates
+in lockstep, so one core is only ever seen under contention and the other only
+ever without:
+
+```text
+trial       1      2      3      4      5      6
+siblings  BUSY   idle   BUSY   idle   BUSY   idle
+measured  cpu0   cpu2   cpu0   cpu2   cpu0   cpu2
+```
+
+### Result
+
+```text
+                             cpu0            cpu2
+undisturbed truth        65725063        65779750      0.1% apart
+correlational (aliased)  86916611        66036796       32% apart
+
+correlational concludes: cpu2 is 30% better  <-- INVENTED
+causal concludes:        1.4% of the mean, and declines to act on it
+```
+
+The correlational agent confidently manufactures a 30% difference between two
+cores that differ by 0.1%. The causal agent, under the identical disturbance,
+finds 1.4% and refuses to act on it. The only difference between them is that
+one decides which arm to measure by the round and the other by a coin flip,
+which decouples the arm from the phase.
+
+This is the strongest form of the trap: a confounder that *narrows a real gap*
+is a nuisance, while one that *invents a difference out of nothing* is how a
+system comes to act confidently on a fact about itself that is false.
+
+### A methodological failure worth recording
+
+The first run of these tests reported SMT contention as 1% and two identical
+cores as 30% apart. Both nonsense, and the cause was that five tests each
+spawning pinned load were running in parallel: every test's baseline was
+polluted by the others' disturbance.
+
+That is not a flaky test. It is the apparatus being part of the machine it is
+measuring, which is this project's whole subject. Serialisation is now enforced
+by a mutex rather than by a command-line flag, because a flag can be forgotten.
+
+---
+
+## 7. The theory engine's alarm fired on its first real run
 
 ```text
 7749 hypotheses stated, 3952 trials, 0 refuted and buried
@@ -168,7 +229,7 @@ item.
 
 ---
 
-## 7. Four bugs only real hardware could expose
+## 8. Four bugs only real hardware could expose
 
 **The consumer pipeline never read `Semantics`.** It clustered on raw cumulative
 counters, and a counter near 9e14 moving by 4e7 per frame is constant to one
@@ -199,11 +260,7 @@ corrupt**.
 
 ---
 
-## 8. What is still not real
-
-**The credulity traps.** Five synthetic worlds with planted confounding. The
-mechanism they test is real; the worlds are not, and no real equivalent has been
-built.
+## 9. What is still not real
 
 **The capability atlas.** Its transitions come from synthetic observations. It
 has never been fed real actions on this machine.

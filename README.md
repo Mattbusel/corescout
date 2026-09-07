@@ -567,6 +567,23 @@ The mirror observes this machine in **6.8 microseconds** per pass, and from 900
 reflections coined 3 concepts out of 32 discovered states, with knowing the
 state reducing prediction error by 42.4%.
 
+**Correlation invents a difference that is not there.** Two interchangeable
+P-cores, 0.1% apart undisturbed. Put real SMT contention on both their siblings
+on one schedule, and let a sampler alternate in lockstep with it:
+
+```text
+                             cpu0            cpu2
+undisturbed truth        65725063        65779750      0.1% apart
+correlational (aliased)  86916611        66036796       32% apart
+
+correlational concludes: cpu2 is 30% better  <-- INVENTED
+causal concludes:        1.4% of the mean, and declines to act on it
+```
+
+The only difference between the two agents is that one picks which arm to
+measure by the round and the other by a coin flip. The confounder is physical:
+a busy SMT sibling makes a core 32% slower, measured.
+
 **The lineage found nothing, and that is the result.** Four generations of real
 placement search: held-out net productivity *fell*, and so did the control's.
 The OS scheduler already puts this work on a P-core, so the search costs cycles
