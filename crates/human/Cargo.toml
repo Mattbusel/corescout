@@ -1,0 +1,21 @@
+[package]
+name = "corescout-human"
+description = "Human-facing projections of machine-native state. Debugging infrastructure."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-memory = { workspace = true }
+corescout-represent = { workspace = true }
+corescout-selfmodel = { workspace = true }
+corescout-identity = { workspace = true }
+corescout-counterfactual = { workspace = true }
+corescout-intent = { workspace = true }
+corescout-observer = { workspace = true }

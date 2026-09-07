@@ -1,0 +1,52 @@
+[package]
+name = "corescout"
+description = "A computational mirror: what this machine physically is, right now."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+keywords = ["cpu", "introspection", "self-model", "telemetry", "scheduling"]
+categories = ["command-line-utilities", "hardware-support"]
+
+[[bin]]
+name = "corescout"
+path = "src/main.rs"
+
+# `mirror-daemon` and `mirror-agent` live here because they need hardware: one
+# publishes the plane, the other acts on the machine. The programs that only
+# read the mirror live in the `mirror-tools` package, which does not depend on
+# `corescout-substrate` at all.
+[[bin]]
+name = "mirror-daemon"
+path = "src/bin/mirror_daemon.rs"
+
+[[bin]]
+name = "mirror-agent"
+path = "src/bin/mirror_agent.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-substrate = { workspace = true }
+corescout-memory = { workspace = true }
+corescout-represent = { workspace = true }
+corescout-science = { workspace = true }
+corescout-concept = { workspace = true }
+corescout-selfmodel = { workspace = true }
+corescout-identity = { workspace = true }
+corescout-intent = { workspace = true }
+corescout-counterfactual = { workspace = true }
+corescout-observer = { workspace = true }
+corescout-agency = { workspace = true }
+corescout-experiment = { workspace = true }
+corescout-analysis = { workspace = true }
+corescout-autonomy = { workspace = true }
+corescout-human = { workspace = true }
+corescout-report = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }

@@ -1,0 +1,20 @@
+[package]
+name = "corescout-experiment"
+description = "Deliberate perturbation: benchmarks, probes and the experiment harness."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-substrate = { workspace = true }
+corescout-agency = { workspace = true }
+corescout-intent = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }

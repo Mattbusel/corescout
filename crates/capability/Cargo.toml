@@ -1,0 +1,19 @@
+[package]
+name = "corescout-capability"
+description = "Capabilities the machine mined from itself: reachability, composition, and the accounting that decides what counts as capital."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# No substrate. A capability is a claim about what this machine can reliably make
+# itself do, and the evidence for it is attempts and their outcomes, not a
+# datasheet.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-concept = { workspace = true }
+corescout-science = { workspace = true }

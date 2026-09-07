@@ -1,0 +1,19 @@
+[package]
+name = "corescout-mirror"
+description = "M(t): the computational mirror and its shared-memory self-state plane."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+
+# Only for the self-state plane's mmap on Linux. The mirror is otherwise pure
+# data: no syscalls, no hardware, nothing platform-specific. Elsewhere the plane
+# falls back to an anonymous region and says so.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }

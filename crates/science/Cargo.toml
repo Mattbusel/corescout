@@ -1,0 +1,19 @@
+[package]
+name = "corescout-science"
+description = "Hypothesis, experiment, falsification: the machine as scientist of itself."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# No substrate. A theory about the machine is built from reflections, never from
+# a privileged peek at the thing being theorised about. That is not a stylistic
+# choice: a scientist who can read the answer key is not doing science.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-memory = { workspace = true }
+corescout-represent = { workspace = true }

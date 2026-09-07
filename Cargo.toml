@@ -1,0 +1,65 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/mirror",
+    "crates/substrate",
+    "crates/memory",
+    "crates/represent",
+    "crates/science",
+    "crates/concept",
+    "crates/capability",
+    "crates/selfmodel",
+    "crates/identity",
+    "crates/intent",
+    "crates/counterfactual",
+    "crates/observer",
+    "crates/agency",
+    "crates/experiment",
+    "crates/analysis",
+    "crates/autonomy",
+    "crates/human",
+    "crates/report",
+    "apps/corescout",
+    "apps/mirror-tools",
+    "integration",
+]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mattbusel/corescout"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+corescout-core = { path = "crates/core" }
+corescout-mirror = { path = "crates/mirror" }
+corescout-substrate = { path = "crates/substrate" }
+corescout-memory = { path = "crates/memory" }
+corescout-represent = { path = "crates/represent" }
+corescout-science = { path = "crates/science" }
+corescout-concept = { path = "crates/concept" }
+corescout-capability = { path = "crates/capability" }
+corescout-selfmodel = { path = "crates/selfmodel" }
+corescout-identity = { path = "crates/identity" }
+corescout-intent = { path = "crates/intent" }
+corescout-counterfactual = { path = "crates/counterfactual" }
+corescout-observer = { path = "crates/observer" }
+corescout-agency = { path = "crates/agency" }
+corescout-experiment = { path = "crates/experiment" }
+corescout-analysis = { path = "crates/analysis" }
+corescout-autonomy = { path = "crates/autonomy" }
+corescout-human = { path = "crates/human" }
+corescout-report = { path = "crates/report" }
+
+[profile.release]
+# The benchmark workloads in `experiment` are part of the measurement
+# apparatus, so the release profile is too. Keep it deterministic.
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = 1

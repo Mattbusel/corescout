@@ -1,0 +1,16 @@
+[package]
+name = "corescout-analysis"
+description = "Value judgements over observations: the original CoreScout rankings."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-substrate = { workspace = true }
+corescout-experiment = { workspace = true }

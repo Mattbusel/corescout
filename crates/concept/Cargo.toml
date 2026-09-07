@@ -1,0 +1,19 @@
+[package]
+name = "corescout-concept"
+description = "Concepts the machine coined about itself, and the virtual resources built from them."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# No substrate. A concept about the machine is earned from reflections; a
+# concept read off a datasheet is our concept wearing the machine's name.
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-memory = { workspace = true }
+corescout-represent = { workspace = true }
+corescout-science = { workspace = true }

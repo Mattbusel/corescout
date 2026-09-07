@@ -1,0 +1,41 @@
+[package]
+name = "corescout-integration"
+description = "Cross-crate and architectural tests for the CoreScout workspace."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+# A package with no library of its own. It exists so that Cargo will run the
+# tests in `tests/`, which span crates and therefore belong to none of them:
+# the architectural boundary checks, the two-ontology experiment, and the
+# end-to-end pipeline.
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-substrate = { workspace = true }
+corescout-memory = { workspace = true }
+corescout-represent = { workspace = true }
+corescout-science = { workspace = true }
+corescout-concept = { workspace = true }
+corescout-selfmodel = { workspace = true }
+corescout-identity = { workspace = true }
+corescout-intent = { workspace = true }
+corescout-counterfactual = { workspace = true }
+corescout-observer = { workspace = true }
+corescout-agency = { workspace = true }
+corescout-experiment = { workspace = true }
+corescout-analysis = { workspace = true }
+corescout-autonomy = { workspace = true }
+corescout-human = { workspace = true }
+corescout-report = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }

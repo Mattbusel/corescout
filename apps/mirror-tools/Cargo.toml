@@ -1,0 +1,47 @@
+[package]
+name = "mirror-tools"
+description = "Programs that know a machine only through its mirror, and cannot reach hardware."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+
+# The dependency list below is the point of this package. `corescout-substrate`
+# is absent, so these programs cannot read /proc, /sys, CPUID, MSRs or perf even
+# by mistake: the code to do it is not linked into them. That turns "it only
+# knows the machine through the mirror" from a claim in a comment into a fact
+# about the executable, checkable with `cargo tree`.
+#
+# Anything needing hardware belongs in the `corescout` package instead.
+
+[[bin]]
+name = "mirror-inspect"
+path = "src/bin/mirror_inspect.rs"
+
+[[bin]]
+name = "mirror-observer"
+path = "src/bin/mirror_observer.rs"
+
+[[bin]]
+name = "mirror-learn"
+path = "src/bin/mirror_learn.rs"
+
+[[bin]]
+name = "mirror-replay"
+path = "src/bin/mirror_replay.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-memory = { workspace = true }
+corescout-represent = { workspace = true }
+corescout-science = { workspace = true }
+corescout-concept = { workspace = true }
+corescout-selfmodel = { workspace = true }
+corescout-identity = { workspace = true }
+corescout-observer = { workspace = true }
+corescout-human = { workspace = true }

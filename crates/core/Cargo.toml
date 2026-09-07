@@ -1,0 +1,16 @@
+[package]
+name = "corescout-core"
+description = "Shared primitives: errors, the monotonic clock, CPU sets."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }

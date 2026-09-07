@@ -1,0 +1,16 @@
+[package]
+name = "corescout-selfmodel"
+description = "Z(t): prediction, uncertainty and anomaly detection from the reflection alone."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-memory = { workspace = true }
+corescout-represent = { workspace = true }
