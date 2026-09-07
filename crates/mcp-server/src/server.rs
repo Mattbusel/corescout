@@ -36,6 +36,17 @@ pub trait Backend {
     /// of the model. This is how the AI comes to know CoreScout exists without
     /// anyone having written it into a prompt.
     fn instructions(&self) -> String;
+
+    /// A client has identified itself.
+    ///
+    /// Called before [`Backend::instructions`], so the briefing a client
+    /// receives is generated after CoreScout knows who is asking. Without
+    /// this, an AI can connect and work for an hour and the AI screen still
+    /// says nothing has ever connected.
+    ///
+    /// The default does nothing, so a backend that only answers questions does
+    /// not have to care.
+    fn connected(&self, _name: &str, _version: Option<&str>) {}
 }
 
 /// The stdio server.
@@ -110,6 +121,13 @@ impl<B: Backend> Server<B> {
         match method {
             "initialize" => {
                 self.initialised = true;
+                // Announced before the briefing is asked for, so the briefing
+                // is generated knowing who it is for.
+                if let Some(client) = params.get("clientInfo") {
+                    let name = client.get("name").and_then(Value::as_str).unwrap_or("");
+                    let version = client.get("version").and_then(Value::as_str);
+                    self.backend.connected(name, version);
+                }
                 reply(
                     id,
                     json!({
@@ -202,6 +220,13 @@ mod tests {
     }
 
     impl Backend for Recording {
+        fn connected(&self, name: &str, version: Option<&str>) {
+            self.calls.lock().expect("the lock").push((
+                "connected".into(),
+                json!({ "name": name, "version": version }),
+            ));
+        }
+
         fn call(&self, method: &str, params: &Value) -> Result<Value, String> {
             self.calls
                 .lock()
@@ -240,6 +265,35 @@ mod tests {
             .as_str()
             .expect("instructions")
             .contains("CoreScout"));
+    }
+
+    #[test]
+    fn a_client_that_names_itself_is_announced_before_the_briefing_is_written() {
+        // Otherwise an AI can connect, work for an hour, and the AI screen
+        // still says nothing has ever connected.
+        let mut server = Server::new(Recording::new());
+        ask(
+            &mut server,
+            json!({
+                "jsonrpc":"2.0","id":1,"method":"initialize",
+                "params":{"clientInfo":{"name":"claude-code","version":"2.1"}}
+            }),
+        );
+        let calls = server.backend.calls.lock().expect("the lock");
+        assert_eq!(calls[0].0, "connected", "{calls:?}");
+        assert_eq!(calls[0].1["name"], "claude-code");
+        assert_eq!(calls[0].1["version"], "2.1");
+    }
+
+    #[test]
+    fn a_client_that_names_nothing_still_completes_the_handshake() {
+        let mut server = Server::new(Recording::new());
+        let reply = ask(
+            &mut server,
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        );
+        assert!(reply["error"].is_null(), "{reply}");
+        assert!(server.backend.calls.lock().expect("the lock").is_empty());
     }
 
     #[test]

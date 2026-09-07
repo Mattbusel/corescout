@@ -100,6 +100,16 @@ impl Bridge {
 }
 
 impl Backend for Bridge {
+    fn connected(&self, name: &str, version: Option<&str>) {
+        let Some(client) = &self.client else { return };
+        // A failure here costs the AI screen an entry and nothing else, so it
+        // must not take the handshake down with it.
+        let _ = client.call(
+            "hello",
+            serde_json::json!({ "name": name, "version": version }),
+        );
+    }
+
     fn call(&self, method: &str, params: &Value) -> Result<Value, String> {
         let Some(client) = &self.client else {
             return Err(NOT_RUNNING.into());

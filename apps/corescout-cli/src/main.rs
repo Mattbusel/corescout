@@ -246,10 +246,18 @@ fn render(command: &str, answer: &Value) -> String {
                 }
             ));
             out.push_str(&format!(
-                "{} reflections this run, {} recurring states, {} AI actions observed.\n",
-                number(answer, "observations"),
-                number(answer, "states"),
-                number(answer, "actions"),
+                "{}, {}, {} observed.\n",
+                plural(
+                    number(answer, "observations"),
+                    "reflection this run",
+                    "reflections this run"
+                ),
+                plural(
+                    number(answer, "states"),
+                    "recurring state",
+                    "recurring states"
+                ),
+                plural(number(answer, "actions"), "AI action", "AI actions"),
             ));
         }
         "home" => {
@@ -463,6 +471,14 @@ fn text(value: &Value, key: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string()
+}
+
+/// A count with its noun, pluralised.
+///
+/// "1 AI actions observed" is the kind of thing that makes a product feel like
+/// a debug build.
+fn plural(count: u64, one: &str, many: &str) -> String {
+    format!("{count} {}", if count == 1 { one } else { many })
 }
 
 fn number(value: &Value, key: &str) -> u64 {

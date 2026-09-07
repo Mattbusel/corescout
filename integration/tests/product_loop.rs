@@ -67,6 +67,12 @@ impl World {
 struct Bridge(Api);
 
 impl Backend for Bridge {
+    fn connected(&self, name: &str, version: Option<&str>) {
+        let _ = self
+            .0
+            .call("hello", &json!({ "name": name, "version": version }));
+    }
+
     fn call(&self, method: &str, params: &Value) -> Result<Value, String> {
         self.0.call(method, params).map_err(|e| e.to_string())
     }
@@ -104,13 +110,13 @@ impl Agent {
             attempts: 0,
             failures: 0,
         };
+        // The handshake announces the client, so nothing here has to call
+        // `hello` on its behalf. That is what a real client does too.
         agent.rpc(
             "initialize",
             json!({ "clientInfo": { "name": name, "version": "1.0" } }),
         );
         agent.tool("corescout_status", json!({}));
-        api.call("hello", &json!({ "name": name }))
-            .expect("hello should work");
         agent
     }
 
