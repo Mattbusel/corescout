@@ -106,7 +106,7 @@ impl Verdict {
                 gain,
                 generations,
             } => format!(
-                "held-out net productivity rose from {from:.6} to {to:.6} over {generations} \
+                "held-out net productivity rose from {from:.3e} to {to:.3e} over {generations} \
                  generations, a gain of {:.1}%",
                 gain * 100.0
             ),
@@ -129,7 +129,7 @@ impl Verdict {
                 net_gain * 100.0
             ),
             Verdict::NotImproving { from, to } => format!(
-                "held-out net productivity went from {from:.6} to {to:.6}: the line is not \
+                "held-out net productivity went from {from:.3e} to {to:.3e}: the line is not \
                  getting better"
             ),
             Verdict::Untrustworthy { generation, failed } => format!(
@@ -319,8 +319,8 @@ impl Lineage {
                 generation.name(),
                 generation.inherited_edges,
                 generation.inherited_capabilities,
-                trained.map(|q| format!("{q:.6}")).unwrap_or("n/a".into()),
-                held.map(|q| format!("{q:.6}")).unwrap_or("n/a".into()),
+                trained.map(|q| format!("{q:.3e}")).unwrap_or("n/a".into()),
+                held.map(|q| format!("{q:.3e}")).unwrap_or("n/a".into()),
             ));
         }
         out.push_str(&format!("\n{}\n", self.verdict().describe()));

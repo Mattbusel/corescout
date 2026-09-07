@@ -90,6 +90,19 @@ pub trait Platform: Send + Sync {
     /// callers degrade to statistical outlier detection alone.
     fn thread_switch_counters(&self) -> Option<SwitchCounters>;
 
+    /// Cycles the calling thread has actually been executing.
+    ///
+    /// Not wall time: this excludes every moment the thread was not scheduled,
+    /// so it measures silicon consumed rather than time elapsed. That is the
+    /// quantity a productivity ratio wants in its denominator, because a thread
+    /// that waited a long time did not thereby use more of the machine.
+    ///
+    /// `None` where the platform cannot report it, in which case a caller must
+    /// fall back to wall time and say so.
+    fn thread_cycles(&self) -> Option<u64> {
+        None
+    }
+
     /// Spawn a child process confined to `cpus`.
     ///
     /// The affinity must be applied before the child's `main` runs, otherwise

@@ -544,6 +544,42 @@ it is cheaper. It is faster because it is credulous, and this environment does
 not punish credulity hard enough to show it. That comparison is reported rather
 than tuned away; see `docs/AGENCY.md`.
 
+### Measured on real hardware
+
+An i7-13700KF, 8 P-cores and 8 E-cores, via a real Windows backend. Each
+placement measured with `QueryThreadCycleTime` on real verified work:
+
+```text
+cpu             compute          cache        latency
+cpu0           98689281       42362012         778963   P
+cpu15          99588559       43167973         777253   P
+cpu16         206957509       82413110        1396937   E
+cpu23         207437055       82227510        1396595   E
+```
+
+A clean 2.1x split with no overlap, found in cycles alone; the core-type column
+is from the topology and was not shown to anything measuring. A causal effect
+established from 48 coin-flipped trials: **cpu0 beats cpu23 by 107,190,336
+cycles +/- 635,684**. The same comparison from 40 *chosen* trials establishes
+nothing, and a test asserts it.
+
+The mirror observes this machine in **6.8 microseconds** per pass, and from 900
+reflections coined 3 concepts out of 32 discovered states, with knowing the
+state reducing prediction error by 42.4%.
+
+**The lineage found nothing, and that is the result.** Four generations of real
+placement search: held-out net productivity *fell*, and so did the control's.
+The OS scheduler already puts this work on a P-core, so the search costs cycles
+and returns nothing. Attributable to learning: **-4.1%**. That is this project's
+own standing claim, measured rather than asserted.
+
+The theory engine's alarm fired on its first real run: 7749 hypotheses, 3952
+trials, **zero refutations**, "suspiciously low: is the generator only making
+safe claims?" It is.
+
+Full account, including four bugs only real hardware could expose and a list of
+what is still simulated, in `docs/REAL.md`.
+
 ### Does the same silicon end up doing more work?
 
 The economic question underneath the rest: can compute be spent to manufacture

@@ -89,6 +89,10 @@ impl Platform for WindowsPlatform {
         None
     }
 
+    fn thread_cycles(&self) -> Option<u64> {
+        thread_cycles()
+    }
+
     fn spawn_with_affinity(&self, command: &mut Command, cpus: &CpuSet) -> Result<Child> {
         // Windows has no `pre_exec`. The child is started, its affinity set,
         // and then it runs: there is a brief window in which it is unconfined,
@@ -144,6 +148,36 @@ fn set_process_affinity(pid: u32, cpus: &CpuSet) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+// `QueryThreadCycleTime` is a documented kernel32 export that `windows-sys`
+// 0.52 does not bind, so it is declared here. It is the high-resolution
+// alternative to `GetThreadTimes`, which is quantised to the scheduler tick and
+// therefore useless for anything shorter than about 16 milliseconds.
+#[link(name = "kernel32")]
+extern "system" {
+    fn QueryThreadCycleTime(
+        thread: windows_sys::Win32::Foundation::HANDLE,
+        cycles: *mut u64,
+    ) -> windows_sys::Win32::Foundation::BOOL;
+}
+
+/// Cycles the calling thread has executed.
+///
+/// # What a cycle means on a hybrid part
+///
+/// On this machine a P-core cycle and an E-core cycle are not the same amount
+/// of silicon, energy, or work. Cycles are still the right denominator for
+/// "how much of the machine did this consume", and they are the wrong number
+/// for "how long did this take". Anything comparing placements should report
+/// both, which is why [`Platform::thread_cycles`] sits alongside the clock
+/// rather than replacing it.
+pub fn thread_cycles() -> Option<u64> {
+    use windows_sys::Win32::System::Threading::GetCurrentThread;
+    let mut cycles: u64 = 0;
+    // SAFETY: a pseudo-handle to the current thread and an owned out-parameter.
+    let ok = unsafe { QueryThreadCycleTime(GetCurrentThread(), &mut cycles) };
+    (ok != 0).then_some(cycles)
 }
 
 /// The processor brand string, from `CPUID` leaves 0x80000002..0x80000004.
@@ -212,6 +246,36 @@ mod tests {
         assert!(
             vendor == "GenuineIntel" || vendor == "AuthenticAMD" || !vendor.is_empty(),
             "unexpected vendor {vendor:?}"
+        );
+    }
+
+    #[test]
+    fn this_thread_can_count_its_own_cycles() {
+        // Live, and it must actually advance: a counter that stands still would
+        // make every productivity ratio in the project infinite.
+        let before = thread_cycles().expect("Windows reports thread cycle time");
+        let mut sink = 0u64;
+        for i in 0..2_000_000u64 {
+            sink = sink.wrapping_add(i ^ sink);
+        }
+        std::hint::black_box(sink);
+        let after = thread_cycles().expect("still reports");
+        assert!(after > before, "cycles did not advance across real work");
+    }
+
+    #[test]
+    fn cycles_are_not_wall_time() {
+        // The distinction the whole measurement rests on. Sleeping burns wall
+        // time and no cycles; a thread that waited did not use the machine.
+        let before = thread_cycles().expect("reported");
+        std::thread::sleep(std::time::Duration::from_millis(80));
+        let after = thread_cycles().expect("reported");
+        let burned = after - before;
+        // A sleeping thread executes some cycles waking up, but nowhere near
+        // 80 ms worth at any plausible clock.
+        assert!(
+            burned < 10_000_000,
+            "sleeping burned {burned} cycles, so this is measuring wall time"
         );
     }
 

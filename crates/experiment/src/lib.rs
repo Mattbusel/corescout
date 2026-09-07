@@ -26,8 +26,10 @@
 pub mod baselines;
 pub mod benchmarks;
 pub mod harness;
+pub mod trial;
 pub mod workloads;
 
 pub use baselines::{Baseline, Placement};
 pub use harness::{Comparison, Harness, Measurement, ScenarioResult, Verdict};
+pub use trial::{run as run_trial, Trial};
 pub use workloads::{Metric, Scenario, ScenarioKind};
