@@ -57,14 +57,22 @@ export async function shell(command: string, args: Record<string, unknown> = {})
   return invoke(command, args);
 }
 
+/** Whether CoreScout starts at sign-in, and who decides. */
+export interface Startup {
+  enabled: boolean;
+  /** False inside a Store install, where Windows owns this. */
+  changeable: boolean;
+  explain: string;
+}
+
 /** Whether CoreScout starts when this user signs in. */
-export async function launchAtLogin(): Promise<boolean> {
-  return Boolean(await shell("launch_at_login"));
+export async function launchAtLogin(): Promise<Startup | null> {
+  return (await shell("launch_at_login")) as Startup | null;
 }
 
 /** Turn starting at sign-in on or off, and report what it ended up as. */
-export async function setLaunchAtLogin(enabled: boolean): Promise<boolean> {
-  return Boolean(await shell("set_launch_at_login", { enabled }));
+export async function setLaunchAtLogin(enabled: boolean): Promise<Startup | null> {
+  return (await shell("set_launch_at_login", { enabled })) as Startup | null;
 }
 
 /** Open the folder CoreScout keeps its data in. */
@@ -182,6 +190,9 @@ export interface Setup {
   snippet: string;
   command?: string;
   instructions: string[];
+  /** The hooks block, where CoreScout can watch this client directly. */
+  hook_snippet?: string;
+  hook_path?: string;
 }
 
 export interface Question {

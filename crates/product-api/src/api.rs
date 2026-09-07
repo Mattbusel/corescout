@@ -135,10 +135,20 @@ impl Api {
             "configure" => {
                 let name = string(params, "agent")?;
                 let kind = AgentKind::recognise(&name);
-                let path = setup::apply(&kind)?;
+                // The server and the hooks are two separate files and either
+                // can fail on its own. A client that ends up with one of them
+                // still works, so neither failure is allowed to hide the other.
+                let server = setup::apply(&kind);
+                let hooks = setup::apply_hooks(&kind);
+                if server.is_err() && hooks.is_err() {
+                    return Err(server.expect_err("checked"));
+                }
                 Ok(json!({
                     "configured": kind.title(),
-                    "path": path.display().to_string(),
+                    "server": server.as_ref().ok().map(|p| p.display().to_string()),
+                    "server_error": server.as_ref().err().map(|e| e.to_string()),
+                    "hooks": hooks.as_ref().ok().map(|p| p.display().to_string()),
+                    "hooks_error": hooks.as_ref().err().map(|e| e.to_string()),
                     "restart_required": true,
                     "note": format!("Restart {} for it to pick this up.", kind.title()),
                 }))

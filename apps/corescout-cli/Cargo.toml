@@ -15,3 +15,6 @@ path = "src/main.rs"
 serde_json = { workspace = true }
 corescout-core = { workspace = true }
 corescout-product-api = { workspace = true }
+# `run --placement` confines a child process to some of this machine's cores,
+# so unlike the rest of the command line it does reach hardware.
+corescout-substrate = { workspace = true }

@@ -27,12 +27,155 @@ pub const SERVER_NAME: &str = "corescout";
 
 /// The MCP bridge executable, as it should appear in a configuration file.
 pub fn bridge_command() -> String {
+    beside("corescout-mcp")
+}
+
+/// The command line executable, which is what a hook invokes.
+pub fn cli_command() -> String {
+    beside("corescout")
+}
+
+/// A program installed next to this one.
+///
+/// Next to, rather than found on the path: a machine with two CoreScout builds
+/// on it would otherwise have an agent talking to whichever one the path
+/// happened to name, which is the most confusing failure available here.
+fn beside(name: &str) -> String {
+    let file = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
     std::env::current_exe()
         .ok()
-        .and_then(|exe| exe.parent().map(|dir| dir.join("corescout-mcp.exe")))
+        .and_then(|exe| exe.parent().map(|dir| dir.join(&file)))
         .filter(|path| path.exists())
         .map(|path| path.display().to_string())
-        .unwrap_or_else(|| "corescout-mcp".into())
+        .unwrap_or_else(|| name.to_string())
+}
+
+/// Where an agent keeps its hook configuration, where CoreScout knows.
+pub fn hooks_path(kind: &AgentKind) -> Option<PathBuf> {
+    match kind {
+        AgentKind::ClaudeCode => Some(home().join(".claude").join("settings.json")),
+        _ => None,
+    }
+}
+
+/// The hooks block for a client, as JSON to paste or write.
+///
+/// This is what turns CoreScout from something an AI reports to when it thinks
+/// of it into something that sees the work. It matches the tools that do
+/// something and deliberately not the ones that read.
+pub fn hooks_snippet(kind: &AgentKind) -> Option<String> {
+    hooks_path(kind)?;
+    let command = format!("\"{}\" hook", cli_command());
+    let block = serde_json::json!({
+        "hooks": {
+            "PostToolUse": [{
+                "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task",
+                "hooks": [{ "type": "command", "command": command, "timeout": 5 }]
+            }]
+        }
+    });
+    serde_json::to_string_pretty(&block).ok().map(|mut text| {
+        text.push('\n');
+        text
+    })
+}
+
+/// Write the hooks block into a client's settings, keeping everything else.
+///
+/// Hooks are somebody's agent configuration. A file that cannot be parsed is
+/// left exactly as it was, and CoreScout's own entry is replaced rather than
+/// appended, so running this twice does not produce two of them.
+pub fn apply_hooks(kind: &AgentKind) -> Result<PathBuf> {
+    let path = hooks_path(kind).ok_or_else(|| {
+        Error::invalid(format!(
+            "CoreScout does not know where {} keeps its hooks. The setup screen has the block to \
+             paste in.",
+            kind.title()
+        ))
+    })?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|source| Error::io(parent, source))?;
+    }
+    let text = merge_hooks(&path, &cli_command())?;
+    std::fs::write(&path, text).map_err(|source| Error::io(&path, source))?;
+    Ok(path)
+}
+
+/// Put CoreScout's hook into a settings file, keeping everything else.
+///
+/// Separated from the writing so it can be tested without a home directory,
+/// which is exactly the sort of thing that otherwise gets checked by hand once
+/// and never again.
+fn merge_hooks(path: &std::path::Path, executable: &str) -> Result<String> {
+    let existing = std::fs::read_to_string(path).unwrap_or_default();
+    let mut root: serde_json::Value = if existing.trim().is_empty() {
+        serde_json::json!({})
+    } else {
+        serde_json::from_str(&existing).map_err(|error| {
+            Error::invalid(format!(
+                "{} could not be read as JSON ({error}), so CoreScout left it alone. Paste the \
+                 block in yourself and nothing will be lost.",
+                path.display()
+            ))
+        })?
+    };
+
+    let command = format!("\"{executable}\" hook");
+    let entry = serde_json::json!({
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task",
+        "hooks": [{ "type": "command", "command": command, "timeout": 5 }]
+    });
+
+    let hooks = root
+        .as_object_mut()
+        .ok_or_else(|| Error::invalid(format!("{} is not a JSON object", path.display())))?
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}));
+    let post = hooks
+        .as_object_mut()
+        .ok_or_else(|| {
+            Error::invalid(format!(
+                "{} has a hooks that is not an object",
+                path.display()
+            ))
+        })?
+        .entry("PostToolUse")
+        .or_insert_with(|| serde_json::json!([]));
+    let list = post.as_array_mut().ok_or_else(|| {
+        Error::invalid(format!(
+            "{} has a PostToolUse that is not a list",
+            path.display()
+        ))
+    })?;
+    // Replace CoreScout's own entry rather than adding a second one.
+    list.retain(|item| !mentions_corescout(item));
+    list.push(entry);
+
+    serde_json::to_string_pretty(&root)
+        .map(|mut text| {
+            text.push('\n');
+            text
+        })
+        .map_err(|error| Error::invalid(format!("could not write the hooks: {error}")))
+}
+
+/// Whether a hook entry is one CoreScout put there.
+fn mentions_corescout(entry: &serde_json::Value) -> bool {
+    entry
+        .get("hooks")
+        .and_then(serde_json::Value::as_array)
+        .map(|hooks| {
+            hooks.iter().any(|hook| {
+                hook.get("command")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(|command| command.to_lowercase().contains("corescout"))
+            })
+        })
+        .unwrap_or(false)
 }
 
 fn home() -> PathBuf {
@@ -122,6 +265,15 @@ pub fn setup(kind: &AgentKind) -> Setup {
             None,
         ),
     };
+    let hooks = hooks_snippet(kind);
+    let mut instructions = instructions;
+    if hooks.is_some() {
+        instructions.push(
+            "Then let CoreScout watch the work itself, so it does not depend on your AI \
+             remembering to mention it."
+                .to_string(),
+        );
+    }
     Setup {
         agent: kind.slug(),
         title: kind.title(),
@@ -130,6 +282,8 @@ pub fn setup(kind: &AgentKind) -> Setup {
         snippet: snippet(kind),
         command: shell,
         instructions,
+        hook_snippet: hooks,
+        hook_path: hooks_path(kind).map(|p| p.display().to_string()),
     }
 }
 
@@ -381,6 +535,98 @@ mod tests {
         let updated = append_toml(existing, &snippet(&AgentKind::Codex));
         assert!(updated.starts_with(existing));
         assert!(updated.contains("[mcp_servers.corescout]"));
+    }
+
+    #[test]
+    fn claude_code_gets_a_hooks_block_and_the_others_do_not_yet() {
+        // Hooks are what make CoreScout see the work rather than wait to be
+        // told about it. Where CoreScout does not know a client's format, it
+        // offers nothing rather than guessing at one.
+        let claude = setup(&AgentKind::ClaudeCode);
+        let hooks = claude.hook_snippet.expect("a hooks block");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&hooks).expect("the block must be valid JSON");
+        assert!(parsed["hooks"]["PostToolUse"][0]["matcher"]
+            .as_str()
+            .expect("a matcher")
+            .contains("Bash"));
+        assert!(claude.hook_path.is_some());
+
+        assert!(setup(&AgentKind::Mcp).hook_snippet.is_none());
+        assert!(setup(&AgentKind::Named("something-new".into()))
+            .hook_snippet
+            .is_none());
+    }
+
+    #[test]
+    fn writing_hooks_keeps_every_other_hook_the_user_had() {
+        // The failure that would make somebody uninstall this: CoreScout adds
+        // its hook and their own stop running.
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            "{\"model\":\"opus\",\"hooks\":{\"PostToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"my-own-thing\"}]}]}}",
+        )
+        .expect("write");
+
+        let updated = merge_hooks(&path, "corescout.exe").expect("merge");
+        let parsed: serde_json::Value = serde_json::from_str(&updated).expect("valid");
+        assert_eq!(parsed["model"], "opus", "unrelated settings survive");
+        let list = parsed["hooks"]["PostToolUse"].as_array().expect("a list");
+        assert_eq!(list.len(), 2, "theirs and ours: {updated}");
+        assert_eq!(list[0]["hooks"][0]["command"], "my-own-thing");
+    }
+
+    #[test]
+    fn writing_hooks_twice_does_not_produce_two_of_them() {
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{}").expect("write");
+        let once = merge_hooks(&path, "corescout.exe").expect("merge");
+        std::fs::write(&path, &once).expect("write");
+        let twice = merge_hooks(&path, "corescout.exe").expect("merge");
+        let parsed: serde_json::Value = serde_json::from_str(&twice).expect("valid");
+        assert_eq!(
+            parsed["hooks"]["PostToolUse"]
+                .as_array()
+                .expect("a list")
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_settings_file_that_cannot_be_parsed_is_left_exactly_as_it_was() {
+        // Somebody's agent configuration rebuilt from a failed parse is
+        // somebody's agent configuration destroyed.
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{ not json").expect("write");
+        let error = merge_hooks(&path, "corescout.exe")
+            .expect_err("should refuse")
+            .to_string();
+        assert!(error.contains("left it alone"), "{error}");
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read"),
+            "{ not json",
+            "the file must be untouched"
+        );
+    }
+
+    #[test]
+    fn a_windows_path_in_a_hook_survives_into_valid_json() {
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{}").expect("write");
+        let updated =
+            merge_hooks(&path, "C:\\Program Files\\CoreScout\\corescout.exe").expect("merge");
+        let parsed: serde_json::Value = serde_json::from_str(&updated).expect("valid JSON");
+        let command = parsed["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
+            .as_str()
+            .expect("a command");
+        assert!(command.contains("Program Files"), "{command}");
+        assert!(command.ends_with(" hook"), "{command}");
     }
 
     #[test]

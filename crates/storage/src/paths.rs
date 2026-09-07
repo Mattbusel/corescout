@@ -18,6 +18,13 @@ pub fn data_dir() -> PathBuf {
     if let Some(explicit) = std::env::var_os("CORESCOUT_DATA_DIR") {
         return PathBuf::from(explicit);
     }
+    // A packaged build's writes under `%LOCALAPPDATA%` are redirected by
+    // Windows into the package's own store, so writing there would succeed and
+    // put the files somewhere this function does not name. The Privacy page
+    // shows whatever this returns, and it has to be true.
+    if let Some(packaged) = crate::packaged::package_data_dir() {
+        return packaged;
+    }
     #[cfg(windows)]
     {
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
@@ -86,6 +93,22 @@ mod tests {
         match previous {
             Some(value) => std::env::set_var("CORESCOUT_DATA_DIR", value),
             None => std::env::remove_var("CORESCOUT_DATA_DIR"),
+        }
+    }
+
+    #[test]
+    fn a_packaged_build_keeps_its_data_where_it_says_it_does() {
+        // Not exercised here -- a test binary is never packaged -- so this
+        // asserts the shape of the answer rather than the answer. The failure
+        // it guards against is the Privacy page naming a folder the data is
+        // not in, which would make "delete everything" delete nothing.
+        let _guard = exclusive();
+        match crate::packaged::package_data_dir() {
+            Some(path) => {
+                assert!(path.to_string_lossy().contains("LocalCache"));
+                assert!(path.ends_with("CoreScout"));
+            }
+            None => assert!(!crate::packaged::is_packaged()),
         }
     }
 

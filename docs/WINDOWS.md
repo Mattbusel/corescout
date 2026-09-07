@@ -112,6 +112,16 @@ CoreScout_0.3.0_x64_en-US.msi      the same
 Tauri downloads NSIS and the WiX toolset on first run. Both are verified
 against a published hash by Tauri itself.
 
+## The Store package
+
+```powershell
+pwsh scripts/msix.ps1
+```
+
+Produces `dist/CoreScout.msix`, about 1.8 MB. It installs and runs; the Store
+will reject it until it carries an identity issued by Partner Center. See
+[STORE.md](STORE.md).
+
 ## Signing
 
 The published builds are unsigned, so SmartScreen objects. That is correct

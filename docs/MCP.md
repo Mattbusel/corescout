@@ -41,6 +41,83 @@ file, because that file's format belongs to Claude Code and not to CoreScout.
 
 ---
 
+## The other half: letting CoreScout watch
+
+An AI reports what it did when it *chooses* to call `corescout_observe`. That
+is a product whose central promise depends on a model remembering, which it
+will do sometimes.
+
+A hook fires on every tool call whether anybody thought about it or not.
+
+```jsonc
+// %USERPROFILE%\.claude\settings.json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task",
+      "hooks": [{
+        "type": "command",
+        "command": "\"C:\\Program Files\\CoreScout\\corescout.exe\" hook",
+        "timeout": 5
+      }]
+    }]
+  }
+}
+```
+
+The AI screen writes this for you, keeping every other hook you already had.
+`Read`, `Glob` and `Grep` are deliberately not matched: reading a file is not
+an operation with an outcome, and not recording one is also not storing one.
+
+### What a hook can and cannot see
+
+It sees the command, the timing, the files touched, and what came before what.
+Those are exactly what the pattern analysis needs and they are reliable.
+
+It does **not** reliably see an exit code. Claude Code reports a tool result,
+not a process status, and its shape differs between versions. So CoreScout
+records a definite outcome only on a signal it can justify — a process status,
+an explicit error flag, an interrupted call, a result that begins with an error
+— and records "nothing was said" otherwise, which the rest of the system
+already treats as an unknown rather than a success.
+
+Specifically, and deliberately: **a non-empty stderr is not a failure.** Cargo
+writes its entire progress there. A tool that read that as failure would decide
+every build in the repository had failed.
+
+A hook also never claims to have verified anything. It watched; it did not
+check.
+
+### If it seems not to be working
+
+```powershell
+$env:CORESCOUT_HOOK_DEBUG = 1
+```
+
+The hook then says on stderr what it did with each event, where the agent will
+show it. Without that a hook that is silently doing nothing is
+indistinguishable from one that is working.
+
+### Exactly, when it matters
+
+```bash
+corescout run -- cargo build
+corescout run --placement fast -- cargo test
+```
+
+This owns the process and therefore owns its exit code, so unlike a hook it can
+honestly say it verified the outcome. It passes the child's output and exit
+code straight through, so it can go in front of anything without changing what
+the caller sees.
+
+`--placement` confines the child to one kind of core on a machine that has
+more than one, and does nothing at all on a machine whose cores are all the
+same — pinning work there is a change with no upside. This is also where
+CoreScout can run a real experiment on real work: it is asked which placement
+*before* the command runs, and a fraction of those answers are a coin flip.
+
+---
+
 ## What the AI is told when it connects
 
 The initialise handshake carries an `instructions` field, which clients put in
@@ -85,7 +162,7 @@ out of date, because it is produced at connection time.
 
 ## The tools
 
-Fourteen. Twelve read, two do something.
+Fifteen. Twelve read, three change something.
 
 | tool | what it answers |
 |---|---|
@@ -101,6 +178,7 @@ Fourteen. Twelve read, two do something.
 | `corescout_ask` | A question about a repository, an operation, or the machine |
 | `corescout_explain` | The evidence behind one belief |
 | `corescout_recent_activity` | What has happened recently |
+| `corescout_before` | **Ask before you act: does this have a history here, and is there a better way** |
 | `corescout_observe` | **Report what you just did and how it went** |
 | `corescout_run_capability` | Run a verified procedure, subject to permissions |
 

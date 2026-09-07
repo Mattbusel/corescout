@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CoreScout, packaged for the Microsoft Store.
+
+  Four things in here are load-bearing and easy to get wrong.
+
+  `runFullTrust` is what makes this a packaged desktop application rather than
+  a sandboxed one. CoreScout reads processor counters and starts processes; a
+  sandboxed app can do neither. Every Win32 program in the Store declares it.
+
+  The `startupTask` is declared disabled. Windows then lists CoreScout under
+  Settings -> Apps -> Startup, switched off, and the user turns it on there.
+  A packaged app must not write the registry Run key, and it must not enable
+  itself: adding yourself to startup uninvited is not a decision a product gets
+  to make.
+
+  There are three Applications rather than one. An execution alias names a
+  single executable and may be declared once per Application, so putting both
+  `corescout` and `corescout-mcp` on the user's path takes an entry each. The
+  two extra ones set AppListEntry="none", so they are on the path and not in
+  the Start menu: nobody wants three CoreScout tiles.
+
+  Identity/Name and Publisher below are placeholders. They come from Partner
+  Center when the app name is reserved, and they must match exactly or the
+  upload is rejected. See docs/STORE.md.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap4="http://schemas.microsoft.com/appx/manifest/uap/windows10/4"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 uap4 uap5 desktop rescap">
+
+  <Identity
+    Name="CORESCOUT_IDENTITY_NAME"
+    Publisher="CORESCOUT_PUBLISHER"
+    Version="CORESCOUT_VERSION"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>CoreScout</DisplayName>
+    <PublisherDisplayName>CORESCOUT_PUBLISHER_DISPLAY</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Your computer, learning how to work with your AI. Everything stays on this machine.</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- Windows 10 2004. Below that the WebView2 runtime is not present as
+         standard and the package would have to carry a browser. -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.19041.0"
+      MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Capabilities>
+    <!-- The only one. CoreScout declares no network capability, because it
+         opens no connection: there is nothing for it to talk to. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="CoreScout" Executable="CoreScout.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="CoreScout"
+        Description="Your computer, learning how to work with your AI."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Wide310x150Logo="Assets\Wide310x150Logo.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Assets\SplashScreen.png" BackgroundColor="#0E0E11" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- Off until the user turns it on, in the place they expect to find
+             it. See the note at the top of this file. -->
+        <uap5:Extension Category="windows.startupTask" Executable="CoreScout.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask
+            TaskId="CoreScoutStartup"
+            Enabled="false"
+            DisplayName="CoreScout" />
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+
+    <!-- The command line, on the path, and not in the Start menu. -->
+    <Application Id="CoreScoutCli" Executable="corescout.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        AppListEntry="none"
+        DisplayName="CoreScout command line"
+        Description="The CoreScout command line."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="corescout.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="corescout.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+
+    <!-- The bridge an AI is pointed at, so a configuration file can name it
+         without an absolute path that changes on every update. -->
+    <Application Id="CoreScoutMcp" Executable="corescout-mcp.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        AppListEntry="none"
+        DisplayName="CoreScout for AI"
+        Description="CoreScout as a Model Context Protocol server."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="corescout-mcp.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="corescout-mcp.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+</Package>

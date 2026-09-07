@@ -11,8 +11,17 @@
 //! ```text
 //!  desktop app ─┐
 //!  CLI ─────────┼─→ loopback HTTP ─→ Api::call ─→ Engine
-//!  MCP bridge ──┘
+//!  MCP bridge ──┤
+//!  agent hooks ─┘
 //! ```
+//!
+//! # Two ways in, on purpose
+//!
+//! An AI reports what it did by calling a tool, which it does when it thinks
+//! of it. A [`hook`] fires on every tool call whether anybody thought about it
+//! or not. The first gives depth — an agent can say what it verified — and the
+//! second gives breadth, which is what makes this a product that works while
+//! you are not thinking about it rather than a demonstration.
 //!
 //! # The transport is boring on purpose
 //!
@@ -27,6 +36,7 @@ pub mod api;
 pub mod client;
 pub mod endpoint;
 pub mod engine;
+pub mod hook;
 pub mod http;
 pub mod setup;
 pub mod view;

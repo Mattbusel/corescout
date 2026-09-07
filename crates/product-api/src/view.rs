@@ -428,6 +428,13 @@ pub struct Setup {
     pub command: Option<String>,
     /// What to do, in words.
     pub instructions: Vec<String>,
+    /// The hooks block, where CoreScout can watch this client's work directly
+    /// rather than waiting to be told about it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hook_snippet: Option<String>,
+    /// Where that block goes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hook_path: Option<String>,
 }
 
 #[cfg(test)]

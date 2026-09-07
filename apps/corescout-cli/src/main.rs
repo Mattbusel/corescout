@@ -13,6 +13,8 @@
 //! anything that wants to parse it, and it is the same object the app receives,
 //! not a summary of it.
 
+mod watch;
+
 use corescout_core::error::{Error, Result};
 use corescout_product_api::Client;
 use serde_json::{json, Value};
@@ -22,6 +24,11 @@ corescout - your computer, learning how to work with your AI
 
 USAGE:
     corescout <COMMAND> [OPTIONS]
+
+WATCHING WORK HAPPEN
+    run [OPTIONS] -- CMD   Run something, measure it exactly, and record it
+    hook                   Record one tool call, read from stdin. For agents.
+    connect [NAME]         Set an AI up to report its work automatically
 
 SEEING WHAT IT KNOWS
     status                  Is CoreScout running, and what is connected
@@ -45,7 +52,7 @@ CAPABILITIES
     approve <ID>            Approve one
     automate <ID>           Approve one and let your AI use it unprompted
     disable <ID>            Switch one off
-    run <ID> [--live]       Run one. Without --live it decides and starts nothing
+    use <ID> [--live]       Use one. Without --live it decides and starts nothing
 
 CONTROL
     mode <MODE>             observe, suggest, assist or autopilot
@@ -61,9 +68,19 @@ PRIVACY AND HEALTH
     forget [--everything]   Delete what it has recorded
     diagnostics             What CoreScout costs to run
 
+OPTIONS FOR run
+    --placement <WHERE>     any, fast, efficient, or ask. Only does anything on
+                            a machine whose cores are not all the same.
+    --quiet                 Say nothing of its own
+
 OPTIONS
     --json                  The raw answer, as the app receives it
     -h, --help              This
+
+EXAMPLES
+    corescout run -- cargo build
+    corescout run --placement fast -- cargo test
+    corescout use cap-1
 
 Everything stays on this computer. Nothing is sent anywhere.
 ";
@@ -84,6 +101,22 @@ fn run(args: &[String]) -> Result<()> {
         print!("{USAGE}");
         return Ok(());
     }
+    // These two do not talk to the API the way everything else does: one runs
+    // a process and one is read from stdin inside somebody's agent loop.
+    match args[0].as_str() {
+        "hook" => {
+            let _ = watch::hook();
+            return Ok(());
+        }
+        "run" => {
+            let code = watch::run(&args[1..], args.iter().any(|a| a == "--quiet"))?;
+            // `main` turns an `Ok` into success, so the child's code has to
+            // leave through the process rather than through this function.
+            std::process::exit(exit_code(code));
+        }
+        _ => {}
+    }
+
     let json_output = args.iter().any(|a| a == "--json");
     let positional: Vec<&str> = args
         .iter()
@@ -142,6 +175,10 @@ fn route(command: &str, argument: Option<&str>, args: &[String]) -> Result<(Stri
         }
         "computer" => ("computer".into(), json!({})),
         "states" => ("states".into(), json!({})),
+        "connect" => {
+            let name = argument.unwrap_or("claude-code");
+            ("setup".into(), json!({ "agent": name, "hooks": true }))
+        }
         "ai" => match argument {
             None => ("agents".into(), json!({})),
             Some("setup") => (
@@ -178,7 +215,7 @@ fn route(command: &str, argument: Option<&str>, args: &[String]) -> Result<(Stri
             "decide".into(),
             json!({ "id": needs("an id")?, "approved": true, "disabled": true }),
         ),
-        "run" => (
+        "use" => (
             "run".into(),
             // A dry run unless told otherwise. Running something on someone's
             // machine because they typed four characters is the wrong default.
@@ -409,6 +446,21 @@ fn render(command: &str, answer: &Value) -> String {
                 out.push_str(&format!("{}\n", text(&agent, "summary")));
             }
         }
+        "connect" => {
+            out.push_str(&format!("{}\n\n", text(answer, "title")));
+            for line in list(answer, "instructions") {
+                out.push_str(&format!("  {line}\n"));
+            }
+            if let Some(command) = answer.get("command").and_then(Value::as_str) {
+                out.push_str(&format!("\n  {command}\n"));
+            }
+            if let Some(hooks) = answer.get("hook_snippet").and_then(Value::as_str) {
+                out.push_str(&format!(
+                    "\nAnd this, so CoreScout sees the work without your AI having to \
+                     mention it:\n\n{hooks}\n"
+                ));
+            }
+        }
         "privacy" => {
             out.push_str(&format!(
                 "Everything is in {}\n{} bytes. Telemetry: {}.\n\n",
@@ -463,6 +515,19 @@ fn render(command: &str, answer: &Value) -> String {
         }
     }
     out
+}
+
+/// The number to exit a process with, from an `ExitCode`.
+///
+/// `ExitCode` deliberately does not expose its value, and `corescout run`
+/// exists to pass a child's status through unchanged, so the two are
+/// reconciled here rather than by silently returning zero.
+fn exit_code(code: std::process::ExitCode) -> i32 {
+    if format!("{code:?}") == format!("{:?}", std::process::ExitCode::SUCCESS) {
+        0
+    } else {
+        1
+    }
 }
 
 fn text(value: &Value, key: &str) -> String {
@@ -548,12 +613,25 @@ mod tests {
     fn every_command_in_the_help_can_be_routed() {
         // A command documented and not routed is one someone will type.
         for line in USAGE.lines() {
+            // Exactly four spaces, then a word. Anything indented further is a
+            // wrapped continuation of the line above, and reading one as a
+            // command name is how this test started failing on prose.
+            if !line.starts_with("    ") || line.starts_with("     ") {
+                continue;
+            }
             let trimmed = line.trim_start();
-            if !line.starts_with("    ") || trimmed.starts_with('-') || trimmed.is_empty() {
+            if trimmed.starts_with('-') || trimmed.is_empty() {
                 continue;
             }
             let name = trimmed.split_whitespace().next().unwrap_or_default();
             if name.is_empty() || name.starts_with('<') || name == "corescout" {
+                continue;
+            }
+            // `run` and `hook` are answered before the API dispatch, because
+            // one runs a process and the other is read from stdin inside an
+            // agent loop. They are named here rather than skipped silently, so
+            // adding a third one has to be a deliberate act.
+            if matches!(name, "run" | "hook") {
                 continue;
             }
             let attempted = route(name, Some("x"), &args(&format!("{name} x --folder p")));
@@ -567,13 +645,33 @@ mod tests {
     }
 
     #[test]
-    fn running_a_capability_is_a_dry_run_unless_asked_otherwise() {
+    fn the_two_commands_handled_before_the_dispatch_are_the_two_that_have_to_be() {
+        // `run` owns a child process and `hook` is read from stdin inside an
+        // agent loop. Everything else is one API call and must stay that way.
+        for name in ["run", "hook"] {
+            let error = route(name, None, &args(name))
+                .expect_err("these are not API methods")
+                .to_string();
+            assert!(error.contains("is not a command"), "{name}: {error}");
+        }
+    }
+
+    #[test]
+    fn using_a_capability_is_a_dry_run_unless_asked_otherwise() {
         // Running something on someone's machine because they typed four
         // characters is the wrong default.
-        let (method, params) = routed("run cap-1");
+        let (method, params) = routed("use cap-1");
         assert_eq!(method, "run");
         assert_eq!(params["dry_run"], true);
-        assert_eq!(routed("run cap-1 --live").1["dry_run"], false);
+        assert_eq!(routed("use cap-1 --live").1["dry_run"], false);
+    }
+
+    #[test]
+    fn using_a_capability_and_running_a_command_are_different_words() {
+        // `run <ID>` and `run -- cmd` would be the same word for two very
+        // different things, and the wrapper is the one people type constantly.
+        assert_eq!(routed("use cap-1").0, "run");
+        assert!(route("run", None, &args("run")).is_err());
     }
 
     #[test]

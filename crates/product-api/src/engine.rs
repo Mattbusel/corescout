@@ -485,6 +485,10 @@ impl Engine {
     /// An agent reported something it did.
     pub fn agent_observe(&mut self, raw: &Raw) -> Action {
         let now = now_ms();
+        let raw = &Raw {
+            workspace: raw.workspace.as_deref().map(workspace_id),
+            ..raw.clone()
+        };
         let mut action = self.ingest.observe(raw, now);
         action.machine_state = self.current_state();
 
@@ -571,6 +575,10 @@ impl Engine {
     /// somebody a failed build. That is what the evidence costs.
     pub fn advise(&mut self, session: &str, operation: &str, workspace: Option<&str>) -> Advice {
         let fingerprint = corescout_agent_observation::fingerprint::normalise(operation);
+        // Identified here too, so a hook that reported a folder and an agent
+        // that asks about the same folder are talking about one workspace.
+        let identified = workspace.map(workspace_id);
+        let workspace = identified.as_deref();
         let history = self
             .experience
             .operation(&fingerprint, workspace)
@@ -1451,6 +1459,21 @@ impl Engine {
 pub type Status = view::Status;
 /// The home view, re-exported so callers need one import.
 pub type Home = view::Home;
+
+/// What a workspace is called, wherever the caller got it from.
+///
+/// A hook reports the folder it ran in; an agent reports whatever it thinks it
+/// is working on; the command line reports its own directory. Identifying in
+/// one place is what makes those one workspace instead of three, and getting
+/// it wrong means an agent asks about a repository CoreScout has recorded a
+/// great deal about and is told it knows nothing.
+fn workspace_id(given: &str) -> String {
+    let trimmed = given.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    corescout_agent_observation::workspace::identify(std::path::Path::new(trimmed))
+}
 
 fn card_from(pattern: &Pattern) -> view::LearnedCard {
     view::LearnedCard {

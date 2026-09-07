@@ -54,17 +54,18 @@ async fn corescout_call(
     client.call(&method, params).map_err(|error| error.to_string())
 }
 
-/// Whether CoreScout starts when this user signs in.
+/// Whether CoreScout starts when this user signs in, and whether the
+/// application is the thing that decides.
 #[tauri::command]
-fn launch_at_login() -> bool {
-    startup::is_enabled()
+fn launch_at_login() -> startup::Startup {
+    startup::state()
 }
 
 /// Turn starting at sign-in on or off.
 #[tauri::command]
-fn set_launch_at_login(enabled: bool) -> Result<bool, String> {
+fn set_launch_at_login(enabled: bool) -> Result<startup::Startup, String> {
     startup::set_enabled(enabled).map_err(|error| error.to_string())?;
-    Ok(startup::is_enabled())
+    Ok(startup::state())
 }
 
 /// Open the folder CoreScout keeps its data in.

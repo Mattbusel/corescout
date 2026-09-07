@@ -60,7 +60,18 @@ For Claude Code, that is one line:
 claude mcp add corescout --scope user -- "C:\Program Files\CoreScout\corescout-mcp.exe"
 ```
 
+The AI screen also offers a second piece: a hook that fires on every tool call,
+so what CoreScout learns does not depend on your AI remembering to mention
+anything. It writes that for you too, keeping any hooks you already had.
+
 Then use your AI exactly as you normally would. CoreScout does not interrupt.
+
+For a command you want measured exactly, there is a wrapper:
+
+```bash
+corescout run -- cargo build          # exit code and timing, verified
+corescout run --placement fast -- cargo test
+```
 
 ## What you will see
 
@@ -115,6 +126,8 @@ immediately, and it is checked before anything else in the system. See
 ## Command line
 
 ```
+corescout run -- <cmd>    Run something, measure it exactly, record it
+corescout connect         Set an AI up to report its work automatically
 corescout status          Is it running, and what is connected
 corescout learned         Everything it has learned
 corescout explain <id>    The evidence behind one of those
@@ -159,6 +172,7 @@ your machine again
 - [PRIVACY.md](docs/PRIVACY.md) — everything that is stored, and where
 - [SECURITY.md](docs/SECURITY.md) — the boundaries, and how they are enforced
 - [WINDOWS.md](docs/WINDOWS.md) — building, packaging, signing
+- [STORE.md](docs/STORE.md) — the Microsoft Store package, and what a submission needs
 - [ARCHITECTURE_PRODUCT.md](docs/ARCHITECTURE_PRODUCT.md) — the product layers and the rules they follow
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — the research crate graph and what each layer may not do
 

@@ -131,6 +131,7 @@ version = "0.3.0"
 dependencies = [
  "corescout-core",
  "corescout-product-api",
+ "corescout-substrate",
  "serde_json",
 ]
 

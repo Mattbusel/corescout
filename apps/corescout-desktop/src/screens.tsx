@@ -17,6 +17,7 @@ import {
   revealDataFolder,
   setLaunchAtLogin,
   type Agent,
+  type Startup as StartupState,
   type Card,
   type Diagnostics,
   type Explanation,
@@ -383,6 +384,11 @@ export function AI() {
 
       <div className="section">
         <div className="eyebrow">Connect one</div>
+        <p className="muted" style={{ marginBottom: "var(--s4)" }}>
+          Two pieces. The first lets your AI ask CoreScout what it knows. The
+          second lets CoreScout watch the work directly, so what it learns does
+          not depend on your AI remembering to mention anything.
+        </p>
         {setups.data?.map((setup) => (
           <div className="card" key={setup.agent}>
             <div className="card-head">
@@ -427,6 +433,16 @@ export function AI() {
                   </p>
                 ) : null}
                 <pre className="detail">{setup.command ?? setup.snippet}</pre>
+                {setup.hook_snippet ? (
+                  <>
+                    <p className="faint" style={{ marginTop: "var(--s4)" }}>
+                      And this, so CoreScout sees the work rather than waiting to
+                      be told about it.
+                      {setup.hook_path ? ` ${setup.hook_path}` : ""}
+                    </p>
+                    <pre className="detail">{setup.hook_snippet}</pre>
+                  </>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -598,13 +614,13 @@ export function Computer() {
  * state from the registry rather than remembering what it last set.
  */
 function StartAtLogin() {
-  const [on, setOn] = useState<boolean | null>(null);
+  const [state, setState] = useState<StartupState | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     void launchAtLogin().then((value) => {
-      if (alive) setOn(value);
+      if (alive) setState(value);
     });
     return () => {
       alive = false;
@@ -618,25 +634,23 @@ function StartAtLogin() {
       <div className="spread">
         <div>
           <h3>Start CoreScout when I sign in</h3>
-          <p className="faint">
-            {on
-              ? "Your computer keeps learning from the moment you log in. You can also remove this in Task Manager, under Startup."
-              : "CoreScout only runs while you have it open. It will not learn anything in between."}
-          </p>
+          <p className="faint">{state?.explain ?? "Checking…"}</p>
         </div>
-        <button
-          className={`action${on ? "" : " primary"}`}
-          onClick={async () => {
-            try {
-              setOn(await setLaunchAtLogin(!on));
-              setProblem(null);
-            } catch (error) {
-              setProblem(String(error));
-            }
-          }}
-        >
-          {on === null ? "Checking…" : on ? "Turn off" : "Turn on"}
-        </button>
+        {state?.changeable ? (
+          <button
+            className={`action${state.enabled ? "" : " primary"}`}
+            onClick={async () => {
+              try {
+                setState(await setLaunchAtLogin(!state.enabled));
+                setProblem(null);
+              } catch (error) {
+                setProblem(String(error));
+              }
+            }}
+          >
+            {state.enabled ? "Turn off" : "Turn on"}
+          </button>
+        ) : null}
       </div>
       {problem ? <p style={{ color: "var(--stop)" }}>{problem}</p> : null}
     </div>

@@ -33,6 +33,7 @@ pub mod docs;
 pub mod events;
 pub mod ids;
 pub mod migrate;
+pub mod packaged;
 pub mod paths;
 pub mod ring;
 pub mod store;
