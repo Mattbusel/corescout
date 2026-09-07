@@ -806,15 +806,21 @@ the machine only through the mirror.
 
 Everything described above is implemented and tested. What is **not** true yet:
 
-- **Linux x86-64 only.** Other platforms build, run, and fail with a clear
-  message where hardware is needed. The `Platform` trait documents the Windows
-  mapping. The consuming half of the system works anywhere.
+- **Linux and Windows x86-64.** Windows discovers topology through
+  `GetLogicalProcessorInformationEx`, sets affinity group-aware so it works past
+  64 CPUs, and reads per-CPU times and frequency through
+  `NtQuerySystemInformation` and `CallNtPowerInformation`. It has **no**
+  thermal, power or PMU sensors: Windows exposes no supported user-mode
+  interface for any of them, and those absences are published as `Unsupported`
+  rather than as zeros. It also cannot count per-thread context switches, so the
+  benchmark falls back to statistical outlier detection alone, which is a real
+  loss of measurement quality on that platform.
 - **The baseline comparison has not been run at length on real hardware.** The
   harness is built, tested, and honest about noise; the results table is empty
   because filling it needs a quiet Linux box and hours, not more code. Any claim
   that this beats the Linux scheduler would currently be unfounded, and none is
   made.
-- **The observer has only been run against a simulator and synthetic traces.**
+- **The observer has been run on one real machine and otherwise on simulators.**
   The pipeline works and the representation carries the signal. Whether real
   hardware's couplings survive into the mirror at 10 Hz is unknown.
 - **No discovery yet of structure the mirror does not already encode.** The

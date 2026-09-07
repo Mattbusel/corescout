@@ -39,6 +39,9 @@
 //! marking it observed are the same call, and there is no way to write a value
 //! without claiming you observed it.
 
+#[cfg(target_os = "windows")]
+pub mod windows;
+
 pub mod counters;
 pub mod frequency;
 pub mod idle;
@@ -274,12 +277,30 @@ pub trait Sensor: Send {
     fn observe(&mut self, out: &mut StateWriter<'_>) -> SensorOutcome;
 }
 
-/// The default passive sensor set for a Linux machine.
+/// The default passive sensor set for this machine.
 ///
 /// Ordered cheapest-first, so a mirror running under a tight tick budget
 /// degrades by dropping the expensive sensors at the end rather than by
 /// randomly missing whichever ones ran late.
 pub fn default_sensors() -> Vec<Box<dyn Sensor>> {
+    // Windows exposes a different, smaller set through entirely different
+    // interfaces. See `linux_sensors` for the set that reads sysfs and procfs,
+    // which a test with a synthetic tree wants by name rather than by default.
+    #[cfg(target_os = "windows")]
+    {
+        return windows::sensors();
+    }
+    #[allow(unreachable_code)]
+    linux_sensors()
+}
+
+/// The sysfs and procfs sensor set.
+///
+/// Named separately from [`default_sensors`] because it is meaningful on any
+/// platform: the sensors read files by path, so a test can point them at a
+/// synthetic tree and exercise them anywhere. What varies by platform is which
+/// set is the *default*, not which set can be constructed.
+pub fn linux_sensors() -> Vec<Box<dyn Sensor>> {
     vec![
         Box::new(frequency::FrequencySensor::new()),
         Box::new(idle::IdleSensor::new()),

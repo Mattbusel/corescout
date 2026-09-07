@@ -76,22 +76,43 @@ fn an_unknown_profile_names_the_ones_that_exist() {
 }
 
 #[test]
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
 fn unsupported_platforms_say_so_and_point_at_the_port() {
     // The stub backend exists so this is a clear message rather than a
-    // link-time failure or a panic.
+    // link-time failure or a panic. This test used to cover Windows, and does
+    // not any more, because Windows is now a supported backend.
     let (code, _, stderr) = corescout(&["info"]);
     assert_eq!(code, 1);
     assert!(stderr.contains("Linux"), "got: {stderr}");
 }
 
 #[test]
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 fn info_describes_the_real_machine() {
+    // Live, on whichever supported machine is running the suite.
     let (code, stdout, stderr) = corescout(&["info"]);
     assert_eq!(code, 0, "stderr: {stderr}");
     assert!(stdout.contains("Physical cores"));
     assert!(stdout.contains("Logical CPUs"));
+    // It should name a real part rather than a placeholder.
+    assert!(!stdout.contains("unknown"), "got: {stdout}");
+}
+
+#[test]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn the_mirror_observes_this_machine() {
+    // The end-to-end check that the whole project exists to make possible:
+    // point it at the machine running the test and get a reflection back.
+    let (code, stdout, stderr) = corescout(&["mirror", "--once", "--no-publish"]);
+    assert_eq!(code, 0, "stderr: {stderr}");
+    assert!(stdout.contains("Computational Mirror"), "got: {stdout}");
+    assert!(stdout.contains("entities"), "got: {stdout}");
+    // At least one cell must actually hold a value. A mirror of nothing is a
+    // mirror that has not been implemented.
+    assert!(
+        stdout.contains("cumulative") || stdout.contains("kHz"),
+        "the mirror reported no observed values: {stdout}"
+    );
 }
 
 #[test]

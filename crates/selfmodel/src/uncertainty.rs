@@ -145,12 +145,23 @@ impl Confidence {
     /// it is merely matching it; negative means it is actively worse, which is
     /// worth knowing and worth reporting rather than clamping away.
     pub fn skill(&self) -> f64 {
-        if self.baseline_error <= 1e-12 {
-            // The baseline is perfect. The model cannot beat it, and claiming
-            // skill here would be an artefact of dividing by nearly zero.
+        // The baseline is perfect, or so nearly perfect that the ratio is an
+        // artefact of the divisor rather than a fact about the model.
+        //
+        // The threshold has to be *relative*. An absolute floor of 1e-12 is
+        // meaningless on a channel whose values are around 1e15: a baseline
+        // error of 1e-9 there is a perfect prediction in every sense that
+        // matters, and dividing by it produced a reported skill of -3.7e11 the
+        // first time this ran on real hardware.
+        let scale = self.mean_error.abs().max(self.baseline_error.abs());
+        if self.baseline_error <= 1e-12 || self.baseline_error <= scale * 1e-9 {
             return 0.0;
         }
-        1.0 - (self.mean_error / self.baseline_error)
+        // Bounded below. A model can be arbitrarily worse than the baseline,
+        // and letting one cell report -400 would let it swamp any average it
+        // appears in. Minus one means "as wrong as the baseline is right",
+        // which is as much detail as an aggregate can carry.
+        (1.0 - (self.mean_error / self.baseline_error)).max(-1.0)
     }
 
     /// A confidence in `0.0 ..= 1.0`, combining skill with evidence.

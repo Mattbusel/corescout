@@ -16,7 +16,7 @@ use corescout_mirror::entity::EntityClass;
 use corescout_mirror::relation::RelationKind;
 use corescout_mirror::MirrorSnapshot;
 use corescout_substrate::discovery::{Roots, Substrate};
-use corescout_substrate::observation::{default_sensors, Perturbation};
+use corescout_substrate::observation::{linux_sensors, Perturbation};
 use corescout_substrate::platform::linux::sysfs::Sysfs;
 use corescout_substrate::Reflector;
 
@@ -27,7 +27,7 @@ fn observe(machine: &FakeMachine, tag: &str) -> (common::TempTree, MirrorSnapsho
         .read_topology(None)
         .expect("fixture topology");
     let substrate = Substrate::new(topology, Roots::new(tree.sys(), tree.proc()));
-    let mut mirror = Reflector::build(substrate, default_sensors()).expect("build mirror");
+    let mut mirror = Reflector::build(substrate, linux_sensors()).expect("build mirror");
     mirror.observe();
     (tree, mirror.snapshot())
 }
@@ -290,7 +290,7 @@ fn observing_twice_advances_the_sequence_and_refreshes_every_cell() {
         .read_topology(None)
         .unwrap();
     let substrate = Substrate::new(topology, Roots::new(tree.sys(), tree.proc()));
-    let mut mirror = Reflector::build(substrate, default_sensors()).unwrap();
+    let mut mirror = Reflector::build(substrate, linux_sensors()).unwrap();
 
     mirror.observe();
     let first = mirror.snapshot();

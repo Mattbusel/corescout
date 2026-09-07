@@ -15,7 +15,7 @@ use std::sync::Arc;
 use corescout_mirror::plane::{PlaneMemory, PlaneReader, PlaneWriter};
 use corescout_mirror::MirrorSnapshot;
 use corescout_substrate::discovery::{Roots, Substrate};
-use corescout_substrate::observation::default_sensors;
+use corescout_substrate::observation::linux_sensors;
 use corescout_substrate::platform::linux::sysfs::Sysfs;
 use corescout_substrate::Reflector;
 
@@ -36,7 +36,7 @@ fn synthetic_snapshot(tag: &str) -> (common::TempTree, MirrorSnapshot) {
         .read_topology(None)
         .expect("fixture topology");
     let substrate = Substrate::new(topology, Roots::new(tree.sys(), tree.proc()));
-    let mut mirror = Reflector::build(substrate, default_sensors()).expect("mirror");
+    let mut mirror = Reflector::build(substrate, linux_sensors()).expect("mirror");
     mirror.observe();
     (tree, mirror.snapshot())
 }

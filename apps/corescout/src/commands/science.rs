@@ -118,20 +118,30 @@ pub fn investigate(frames: &[MirrorSnapshot]) -> Result<Investigation> {
     let cols = frames[0].channels.len().max(1);
     let entities = frames[0].entities.len();
 
+    // Cumulative channels become rates first. See
+    // `corescout_represent::features`: clustering on raw counters finds one
+    // state and learns nothing, which is what real hardware showed the first
+    // time this ran.
+    let features = corescout_represent::features::extract(frames);
+    if features.len() < 20 {
+        return Err(Error::invalid(format!(
+            "only {} usable feature rows from {} reflections; record a longer trace",
+            features.len(),
+            frames.len()
+        )));
+    }
+
     // Fit on an early slice, so nothing from the scored region leaks into the
     // scaling and flatters the result.
-    let fit: Vec<Vec<f64>> = frames[..(frames.len() / 5).max(4)]
-        .iter()
-        .map(|f| f.state.as_slice().to_vec())
-        .collect();
-    let normalizer = Normalizer::fit(&fit, cols);
+    let fit = (features.len() / 5).max(4);
+    let normalizer = Normalizer::fit(&features.rows[..fit], cols);
 
     let mut catalogue = LatentCatalogue::new(0.9, 32);
-    let mut points = Vec::with_capacity(frames.len());
-    let mut assignments = Vec::with_capacity(frames.len());
-    for frame in frames {
-        let (point, _) = normalizer.apply_filled(frame.state.as_slice(), cols);
-        let (state, _) = catalogue.observe(&point, frame.monotonic_ns);
+    let mut points = Vec::with_capacity(features.len());
+    let mut assignments = Vec::with_capacity(features.len());
+    for (row, time) in features.rows.iter().zip(&features.times_ns) {
+        let (point, _) = normalizer.apply_filled(row, cols);
+        let (state, _) = catalogue.observe(&point, *time);
         assignments.push(state);
         points.push(point);
     }

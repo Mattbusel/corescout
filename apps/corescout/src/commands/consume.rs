@@ -255,27 +255,49 @@ pub fn learn_from(frames: &[MirrorSnapshot]) -> Result<Learned> {
         )));
     }
 
+    // Cumulative channels become rates before anything clusters on them.
+    //
+    // The mirror publishes counters as counters, which is correct: a counter's
+    // value is a fact about the present. A consumer that clusters on those
+    // levels learns nothing, because a counter near 9e14 moving by 4e7 a frame
+    // is constant to one part in twenty million. That is exactly what happened
+    // the first time this ran on real hardware: 900 reflections, one state,
+    // nothing scored.
+    let features = corescout_represent::features::extract(frames);
+    if features.len() < 8 {
+        return Err(Error::invalid(format!(
+            "only {} usable feature rows from {} reflections; record a longer trace",
+            features.len(),
+            frames.len()
+        )));
+    }
+
     // Fit the scaling on an early slice rather than the whole trace: fitting on
     // data the model is then scored against is how a model comes to look better
     // than it is.
-    let fit_frames = (frames.len() / 5).clamp(4, 200);
-    let rows: Vec<Vec<f64>> = frames[..fit_frames]
-        .iter()
-        .map(|frame| frame.state.as_slice().to_vec())
-        .collect();
+    let fit_frames = (features.len() / 5).clamp(4, 200);
     let cols = frames[0].channels.len().max(1);
-    let normalizer = Normalizer::fit(&rows, cols);
+    let normalizer = Normalizer::fit(&features.rows[..fit_frames], cols);
 
     let mut catalogue = LatentCatalogue::new(0.75, 32);
     let mut model = SelfModel::default();
     let mut scored = 0u64;
     let mut skill_total = 0.0;
 
-    for frame in frames {
-        let (point, _filled) = normalizer.apply_filled(frame.state.as_slice(), cols);
-        catalogue.observe(&point, frame.monotonic_ns);
+    for (row, (point, time)) in features.rows.iter().zip(&features.times_ns).enumerate() {
+        let (scaled, _filled) = normalizer.apply_filled(point, cols);
+        catalogue.observe(&scaled, *time);
+        // The self-model still consumes reflections rather than features: it
+        // predicts the machine's next state, which is a claim about the mirror
+        // rather than about a derived view of it.
+        let frame = &frames[row + 1];
         let before = model.scored();
         model.observe(frame);
+        // Commit to a prediction, so the *next* reflection can score it.
+        // Without this nothing is ever pending and nothing is ever scored: the
+        // model would learn continuously and never be asked to be wrong, which
+        // is the same failure the science crate exists to prevent one layer up.
+        model.predict_next();
         if model.scored() > before {
             scored += 1;
             skill_total += model.skill();

@@ -35,6 +35,8 @@ pub mod linux;
 
 pub mod cpuid;
 pub mod stub;
+#[cfg(target_os = "windows")]
+pub mod windows;
 
 /// Counters describing how much the OS interfered with a thread.
 ///
@@ -100,11 +102,15 @@ pub trait Platform: Send + Sync {
 /// A stub backend is returned on unsupported systems: `corescout info` then
 /// fails with a clear message instead of the binary refusing to build.
 pub fn detect() -> Box<dyn Platform> {
+    #[cfg(target_os = "windows")]
+    {
+        Box::new(windows::WindowsPlatform::new())
+    }
     #[cfg(target_os = "linux")]
     {
         Box::new(linux::LinuxPlatform::new())
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         Box::new(stub::StubPlatform::new())
     }

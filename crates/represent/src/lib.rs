@@ -29,6 +29,7 @@
 //! back into human vocabulary. See `ONTOLOGY.md`.
 
 pub mod discover;
+pub mod features;
 pub mod latent;
 pub mod normalize;
 

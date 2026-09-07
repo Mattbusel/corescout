@@ -46,6 +46,11 @@ impl Error {
         }
     }
 
+    /// A failed system call, named, with the OS error code.
+    pub fn syscall(call: &'static str, errno: i32) -> Self {
+        Error::Syscall { call, errno }
+    }
+
     pub fn unsupported(what: impl Into<String>) -> Self {
         Error::Unsupported(what.into())
     }

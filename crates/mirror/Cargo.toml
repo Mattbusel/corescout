@@ -17,3 +17,6 @@ corescout-core = { workspace = true }
 # falls back to an anonymous region and says so.
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { workspace = true }

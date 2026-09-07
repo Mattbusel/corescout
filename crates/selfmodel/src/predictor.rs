@@ -339,21 +339,29 @@ impl SelfModel {
         })
     }
 
-    /// Mean skill across every cell that has been scored enough to judge.
+    /// Typical skill across every cell that has been scored enough to judge.
     ///
     /// The headline number: how much better than "nothing changed" this model
     /// is, on this machine, right now.
+    ///
+    /// # Median, not mean
+    ///
+    /// A machine has cells of wildly different scales, and a mean lets one
+    /// pathological cell decide the figure for all of them. The median says
+    /// what a typical cell does, which is what the question is actually asking.
     pub fn skill(&self) -> f64 {
-        let skills: Vec<f64> = self
+        let mut skills: Vec<f64> = self
             .cells
             .values()
             .filter(|m| m.confidence.samples() >= 10)
             .map(|m| m.confidence.skill())
+            .filter(|s| s.is_finite())
             .collect();
         if skills.is_empty() {
             return 0.0;
         }
-        skills.iter().sum::<f64>() / skills.len() as f64
+        skills.sort_by(|a, b| a.total_cmp(b));
+        skills[skills.len() / 2]
     }
 
     /// Cells the model predicts meaningfully better than the baseline.
