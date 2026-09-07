@@ -173,14 +173,20 @@ impl Agent {
 
     /// The line shown on the AI screen.
     pub fn summary(&self, now_ms: u64) -> String {
+        // The card that shows this also shows the action count as its own
+        // figure. Repeating it here spends the one descriptive line on
+        // something already on screen, so this line says when instead.
+        let ago = now_ms.saturating_sub(self.last_seen_ms) / 60_000;
         if self.connected {
-            format!(
-                "{} connected, {} actions observed",
-                self.kind.title(),
-                self.actions
-            )
+            match ago {
+                0 => format!("{} connected, working now", self.kind.title()),
+                1 => format!("{} connected, last action a minute ago", self.kind.title()),
+                n => format!(
+                    "{} connected, last action {n} minutes ago",
+                    self.kind.title()
+                ),
+            }
         } else {
-            let ago = now_ms.saturating_sub(self.last_seen_ms) / 60_000;
             match ago {
                 0 => format!("{} last seen just now", self.kind.title()),
                 1 => format!("{} last seen a minute ago", self.kind.title()),
@@ -267,10 +273,7 @@ mod tests {
         let mut agent = Agent::new("claude-code", None, 0);
         agent.actions = 23;
         agent.touch(1000);
-        assert_eq!(
-            agent.summary(1000),
-            "Claude Code connected, 23 actions observed"
-        );
+        assert_eq!(agent.summary(1000), "Claude Code connected, working now");
     }
 
     #[test]

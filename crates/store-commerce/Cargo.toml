@@ -1,0 +1,31 @@
+[package]
+name = "corescout-store-commerce"
+description = "What the Microsoft Store says this account has bought. Read-only, and absent outside a Store install."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+corescout-storage = { workspace = true }
+serde = { workspace = true }
+
+# WinRT, for Windows.Services.Store. This is the one place in the workspace
+# that needs projected WinRT rather than a raw extern: the Store API is a COM
+# object graph with async methods, and hand-rolling that would be a bug farm
+# in the code path that decides whether somebody who paid gets what they paid
+# for.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    # For the stock IIterable implementation, which is how a Rust Vec is
+    # passed to a WinRT method that wants a collection.
+    "implement",
+    "Services_Store",
+    "Foundation",
+    "Foundation_Collections",
+    # For IInitializeWithWindow, which the Store purchase dialogue needs before
+    # it will draw over a desktop window.
+    "Win32_Foundation",
+    "Win32_UI_Shell",
+] }

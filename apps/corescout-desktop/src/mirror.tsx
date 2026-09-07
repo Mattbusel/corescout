@@ -46,13 +46,11 @@ function ring(node: Node): number {
 export function MirrorView({
   nodes,
   stateId,
-  seen,
   plain,
   unfamiliar,
 }: {
   nodes: Node[];
   stateId?: number;
-  seen: number;
   plain: string;
   unfamiliar: boolean;
 }) {
@@ -75,6 +73,12 @@ export function MirrorView({
     if (!element) return;
     let frame = 0;
     let running = true;
+
+    // Somebody who has asked their system for less motion has asked for it
+    // here too. A CSS media query cannot reach a canvas, so this is where that
+    // request is honoured: the picture is still drawn, and still correct, it
+    // just stops easing and stops repainting once it has settled.
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
     const draw = () => {
       if (!running) return;
@@ -137,8 +141,13 @@ export function MirrorView({
           // Clarity is how much of this entity is readable. A dim dot is a
           // real gap, not a styling choice.
           dot.targetAlpha = 0.18 + node.clarity * 0.72;
-          dot.radius += (dot.target - dot.radius) * 0.08;
-          dot.alpha += (dot.targetAlpha - dot.alpha) * 0.08;
+          if (still) {
+            dot.radius = dot.target;
+            dot.alpha = dot.targetAlpha;
+          } else {
+            dot.radius += (dot.target - dot.radius) * 0.08;
+            dot.alpha += (dot.targetAlpha - dot.alpha) * 0.08;
+          }
 
           context.beginPath();
           context.fillStyle = withAlpha(ink, dot.alpha);
@@ -149,6 +158,9 @@ export function MirrorView({
 
       // The centre: the machine as one thing, and the pulse when it
       // recognises the state it is in.
+      if (still) {
+        pulse.current = 0;
+      }
       if (pulse.current > 0.01) {
         context.beginPath();
         context.strokeStyle = withAlpha(accent, pulse.current * 0.5);
@@ -163,6 +175,9 @@ export function MirrorView({
       context.arc(cx, cy, 4.5, 0, Math.PI * 2);
       context.fill();
 
+      // One frame is the whole picture when nothing is easing. It is redrawn
+      // when the data changes, because that is this effect's dependency.
+      if (still) return;
       frame = requestAnimationFrame(draw);
     };
 
@@ -183,9 +198,10 @@ export function MirrorView({
         ) : unfamiliar ? (
           <span>This is new. CoreScout has nothing to compare it to yet.</span>
         ) : (
-          <span>
-            State {stateId}, seen {seen} times before.
-          </span>
+          // Deliberately not repeating the count: the line above already has
+          // it, the two are fetched on different intervals, and a screen that
+          // shows "4 times" beside "3 times before" looks broken.
+          <span>Recognised as state {stateId}.</span>
         )}
       </div>
     </div>

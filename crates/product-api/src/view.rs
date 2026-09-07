@@ -409,6 +409,30 @@ pub struct Question {
     pub observed_trials: u32,
 }
 
+/// What this installation has worked out, and what the Store says about it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct WorkedOut {
+    /// One sentence about the licence.
+    pub headline: String,
+    /// Whether this is the Store's free trial rather than a purchase.
+    pub trial: bool,
+    /// Days left of that trial, if it is one.
+    pub trial_days_left: Option<u64>,
+    /// Whether the interface should say anything about it unprompted.
+    pub worth_mentioning: bool,
+    /// What this machine has actually worked out.
+    pub evidence: Vec<Achievement>,
+}
+
+/// One thing this installation has to show for itself.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Achievement {
+    /// The number.
+    pub value: String,
+    /// What it is.
+    pub label: String,
+}
+
 /// How to connect one AI.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Setup {

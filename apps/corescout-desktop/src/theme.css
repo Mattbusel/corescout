@@ -859,3 +859,105 @@ pre.detail {
   border-radius: 999px;
   background: var(--ink-faint);
 }
+
+/* ---------------------------------------------------------------- plan */
+
+/*
+ * The ledger of what this machine worked out.
+ *
+ * Set as a list of facts rather than as a grid of marketing statistics: one
+ * number, one sentence, aligned so the eye runs down the numbers. The
+ * difference between this and a pricing page's "10x faster!" block is that
+ * every row here came from this computer.
+ */
+.ledger {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ledger-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+  background: var(--raised);
+}
+
+.ledger-value {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  min-width: 84px;
+  text-align: right;
+  flex: none;
+}
+
+.ledger-label {
+  color: var(--ink-soft);
+  font-size: var(--t-small);
+  flex: 1;
+}
+
+.plans {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.plan {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  background: var(--raised);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+/* One accent border, no badge, no ribbon, no countdown. */
+.plan.featured {
+  border-color: var(--accent);
+}
+
+.plan-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.plan-price {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.plan p {
+  margin: 0;
+  font-size: var(--t-small);
+}
+
+.plan button {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.field {
+  flex: 1;
+  min-width: 200px;
+  font: inherit;
+  padding: var(--s2) var(--s3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.field:focus-visible {
+  border-color: var(--accent);
+}

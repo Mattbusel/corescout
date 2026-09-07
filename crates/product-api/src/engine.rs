@@ -108,6 +108,13 @@ pub struct Engine {
     seed: u64,
     /// Set when learned state has changed and has not yet been written.
     dirty: bool,
+    /// What that resolves to right now. Recomputed when anything changes
+    /// rather than on every call, because it is read on every observation.
+    /// What the Microsoft Store last said about this copy.
+    ///
+    /// A cache of an answer, not a decision: the Store enforces the licence,
+    /// and this is only so the interface can say something true about it.
+    licence: Option<corescout_store_commerce::Licence>,
 }
 
 /// A trial handed out and waiting for its outcome.
@@ -142,6 +149,13 @@ pub struct Advice {
     /// What is known about how this operation tends to go here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub history: Option<String>,
+    /// Faults belonging to the machine, which no choice of arguments avoids.
+    ///
+    /// Separate from `history` because they are not about this operation. They
+    /// are reported for every operation precisely because the operation is not
+    /// what is wrong.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub machine: Vec<corescout_agent_experience::Fault>,
 }
 
 impl Engine {
@@ -176,6 +190,9 @@ impl Engine {
             })
             .collect();
 
+        // The clock is read once here and never trusted to go backwards. A
+        // fresh installation starts its trial at this moment.
+
         let seed = store
             .meta("seed")?
             .and_then(|value| value.parse().ok())
@@ -209,6 +226,7 @@ impl Engine {
             observing: false,
             trail: Vec::new(),
             pending: BTreeMap::new(),
+            licence: corescout_store_commerce::licence().ok(),
             seed,
             dirty: false,
         })
@@ -236,6 +254,59 @@ impl Engine {
         &self.permissions
     }
 
+    /// What the Store said about this copy, if it has answered.
+    ///
+    /// `None` outside a Store installation, which is every development build.
+    /// Nothing in CoreScout behaves differently either way: the Store enforces
+    /// the licence by not letting an unlicensed copy run, and this exists so
+    /// Settings can say "you own CoreScout" rather than nothing.
+    pub fn licence(&self) -> Option<&corescout_store_commerce::Licence> {
+        self.licence.as_ref()
+    }
+
+    /// Ask the Store again.
+    ///
+    /// # Why failure is silent
+    ///
+    /// Outside a Store installation this cannot work and is not meant to. It
+    /// can also fail for ordinary reasons inside one: no network, nobody
+    /// signed in. None of those are worth telling a user about, and none of
+    /// them change what CoreScout does, because CoreScout does not gate
+    /// anything on the answer.
+    ///
+    /// The last good answer is kept rather than replaced with nothing, so a
+    /// dropped network does not make Settings forget that somebody owns this.
+    ///
+    /// Returns whether the answer changed.
+    pub fn recheck_licence(&mut self) -> bool {
+        match corescout_store_commerce::licence() {
+            Ok(fresh) => {
+                let changed = self.licence.as_ref() != Some(&fresh);
+                if changed {
+                    let _ = self.store.append(Event::new(
+                        EventKind::Permission,
+                        Severity::Notice,
+                        fresh.headline(),
+                    ));
+                }
+                self.licence = Some(fresh);
+                changed
+            }
+            Err(corescout_store_commerce::Unavailable::Unreachable(why)) => {
+                // Worth recording: if this happens to a paying customer it is
+                // the explanation for a support conversation that would
+                // otherwise be a mystery. Not worth interrupting anyone for.
+                let _ = self.store.append(Event::new(
+                    EventKind::Fault,
+                    Severity::Info,
+                    format!("could not ask the Microsoft Store about this copy: {why}"),
+                ));
+                false
+            }
+            Err(_) => false,
+        }
+    }
+
     /// The permission state, to change it.
     pub fn permissions_mut(&mut self) -> &mut Permissions {
         &mut self.permissions
@@ -248,6 +319,88 @@ impl Engine {
             .into_iter()
             .cloned()
             .collect()
+    }
+
+    /// Operations that have gone wrong here, whether or not often enough to
+    /// be called a pattern.
+    ///
+    /// The threshold exists so CoreScout does not present one bad afternoon as
+    /// a tendency, and that is right for what it *claims*. It is wrong as a
+    /// reason to stay silent: an agent asking whether something has failed here
+    /// is better served by "once, and here is what it was" than by "no", which
+    /// is what it used to get. Callers must say which they are showing.
+    pub fn failures_below_threshold(&self) -> Vec<corescout_agent_experience::FailureMode> {
+        let recurring: std::collections::BTreeSet<String> = self
+            .experience
+            .failure_modes()
+            .into_iter()
+            .map(|mode| mode.key.clone())
+            .collect();
+        let mut out: Vec<_> = self
+            .experience
+            .operations()
+            .filter(|mode| mode.failures > 0 && !recurring.contains(&mode.key))
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| b.failures.cmp(&a.failures).then(a.key.cmp(&b.key)));
+        out
+    }
+
+    /// Faults this machine has that no operation can work around.
+    ///
+    /// Re-checked against the filesystem on the way out rather than trusted
+    /// from storage, so a drive that came back stops being warned about the
+    /// moment it does. That check is the evidence these rest on, in place of
+    /// the repetition everything else here needs.
+    pub fn environment_faults(&mut self) -> Vec<corescout_agent_experience::Fault> {
+        let resolved = self
+            .experience
+            .environment
+            .resolve(|path| std::path::Path::new(path).exists());
+        for fault in &resolved {
+            self.dirty = true;
+            self.note(Event::new(
+                EventKind::AgentActivity,
+                Severity::Info,
+                format!("{} is back; that failure should stop happening", fault.path),
+            ));
+        }
+        self.experience.environment.all().cloned().collect()
+    }
+
+    /// Read a failed action for a machine fault, and remember any that is real.
+    ///
+    /// Called on the observe path. The filesystem check happens here, once, at
+    /// the moment of the report: it is the difference between a claim about the
+    /// machine and a guess copied out of an error message.
+    fn learn_environment(&mut self, action: &corescout_agent_observation::Action) {
+        if !action.visibly_failed() {
+            return;
+        }
+        let Some(detail) = action.reported.detail() else {
+            return;
+        };
+        let now = now_ms();
+        for blamed in corescout_agent_experience::environment::candidates(detail) {
+            if std::path::Path::new(&blamed.path).exists() {
+                continue;
+            }
+            let fault = self
+                .experience
+                .environment
+                .record(&blamed, &action.fingerprint, now)
+                .clone();
+            if fault.seen == 1 {
+                self.note(Event::new(
+                    EventKind::Discovery,
+                    Severity::Warning,
+                    format!(
+                        "your computer is missing {}, and it is being used",
+                        fault.path
+                    ),
+                ));
+            }
+        }
     }
 
     /// What CoreScout is currently testing and cannot yet answer.
@@ -517,6 +670,7 @@ impl Engine {
         }
 
         self.experience.observe(&action);
+        self.learn_environment(&action);
         self.dirty = true;
 
         // Settle any trial this action was the outcome of. Without this the
@@ -575,6 +729,10 @@ impl Engine {
     /// somebody a failed build. That is what the evidence costs.
     pub fn advise(&mut self, session: &str, operation: &str, workspace: Option<&str>) -> Advice {
         let fingerprint = corescout_agent_observation::fingerprint::normalise(operation);
+        // Asked for before anything about the operation, because a machine
+        // fault outranks everything else here: there is no point suggesting a
+        // better way to run something that cannot run at all.
+        let machine = self.environment_faults();
         // Identified here too, so a hook that reported a folder and an agent
         // that asks about the same folder are talking about one workspace.
         let identified = workspace.map(workspace_id);
@@ -596,14 +754,26 @@ impl Engine {
         let Some(id) = chosen else {
             return Advice {
                 operation: fingerprint,
-                has_advice: false,
-                steps: Vec::new(),
-                because: match &history {
-                    Some(line) => format!("{line}. CoreScout has no better way to offer yet."),
-                    None => "CoreScout knows nothing about this operation yet.".into(),
+                // A machine fault is advice, and the most actionable kind
+                // there is: it names the cause and it is checkable.
+                has_advice: !machine.is_empty(),
+                steps: machine
+                    .iter()
+                    .filter_map(|fault| fault.workaround.clone())
+                    .collect(),
+                because: match (machine.first(), &history) {
+                    (Some(fault), _) => fault.headline(),
+                    (None, Some(line)) => {
+                        format!("{line}. CoreScout has no better way to offer yet.")
+                    }
+                    (None, None) => "CoreScout knows nothing about this operation yet.".into(),
                 },
-                basis: None,
+                // Not a randomised finding and not a correlation. It is a fact
+                // about the machine, checked against the machine just now, and
+                // saying so is more honest than borrowing either label.
+                basis: (!machine.is_empty()).then(|| "checked just now".to_string()),
                 history,
+                machine,
             };
         };
 
@@ -627,11 +797,15 @@ impl Engine {
         let Some(procedure) = self.experience.procedure_mut(&id) else {
             return Advice {
                 operation: fingerprint,
-                has_advice: false,
+                has_advice: !machine.is_empty(),
                 steps: Vec::new(),
-                because: "CoreScout knows nothing about this operation yet.".into(),
-                basis: None,
+                because: match machine.first() {
+                    Some(fault) => fault.headline(),
+                    None => "CoreScout knows nothing about this operation yet.".into(),
+                },
+                basis: (!machine.is_empty()).then(|| "checked just now".to_string()),
                 history,
+                machine,
             };
         };
         let (apply, randomised) = procedure.decide(believed);
@@ -665,14 +839,23 @@ impl Engine {
             (None, true) => UNTESTED.into(),
             (None, false) => "Do the operation as you normally would.".into(),
         };
+        // A machine fault leads, whatever the procedure had to say. Advising a
+        // better way to run a command that cannot run is worse than useless:
+        // the agent follows the advice, fails anyway, and concludes the advice
+        // was wrong.
+        let because = match machine.first() {
+            Some(fault) => format!("{} {because}", fault.headline()),
+            None => because,
+        };
 
         Advice {
             operation: fingerprint,
-            has_advice: apply && !steps.is_empty(),
+            has_advice: (apply && !steps.is_empty()) || !machine.is_empty(),
             steps: if apply { steps } else { Vec::new() },
             because,
             basis: label,
             history,
+            machine,
         }
     }
 
@@ -774,7 +957,7 @@ impl Engine {
     // ------------------------------------------------------------ decisions
 
     /// Change the autonomy mode.
-    pub fn set_autonomy(&mut self, autonomy: Autonomy) {
+    pub fn set_autonomy(&mut self, autonomy: Autonomy) -> Result<()> {
         let before = self.permissions.autonomy();
         self.permissions.set_autonomy(autonomy);
         self.note(
@@ -789,6 +972,7 @@ impl Engine {
             )
             .outcome("in force from now on"),
         );
+        Ok(())
     }
 
     /// Stop everything.
@@ -1266,6 +1450,66 @@ impl Engine {
             about_workspaces,
             about_machine,
             still_uncertain,
+        }
+    }
+
+    /// What this installation has worked out, for the Settings screen.
+    ///
+    /// This was an upgrade screen: a ledger of what the machine had learned,
+    /// followed by prices and a list of what a paid tier would keep doing.
+    /// The prices and the list are gone, because CoreScout is bought once at
+    /// the door and there is nothing left to sell to somebody already running
+    /// it.
+    ///
+    /// The ledger stayed. It was always the better half: it is the one thing
+    /// about this product that only this installation can show, and it is
+    /// worth showing to somebody who owns it as much as it ever was to
+    /// somebody deciding.
+    pub fn worked_out(&self) -> view::WorkedOut {
+        let knowledge = self.knowledge();
+        let patterns = self.experience.patterns();
+        let verified = patterns.iter().filter(|p| p.basis.is_causal()).count();
+        let failures = self.experience.failure_modes().len();
+
+        let mut evidence = vec![
+            view::Achievement {
+                value: knowledge.machine_states.to_string(),
+                label: "recurring states of this machine, found rather than configured".into(),
+            },
+            view::Achievement {
+                value: self.experience.observed.to_string(),
+                label: "actions watched while your AI worked".into(),
+            },
+        ];
+        if failures > 0 {
+            evidence.push(view::Achievement {
+                value: failures.to_string(),
+                label: "operations that recur and go wrong here".into(),
+            });
+        }
+        if !patterns.is_empty() {
+            evidence.push(view::Achievement {
+                value: patterns.len().to_string(),
+                label: format!(
+                    "things noticed, {verified} of them tested under randomised assignment"
+                ),
+            });
+        }
+
+        let licence = self.licence();
+        view::WorkedOut {
+            headline: licence
+                .map(|licence| licence.headline())
+                // Not "unlicensed". A build that Windows did not install from
+                // the Store cannot ask, and saying so is more honest than
+                // implying something is wrong with the licence.
+                .unwrap_or_else(|| "This build was not installed from the Microsoft Store.".into()),
+            trial: licence.map(|licence| licence.trial).unwrap_or(false),
+            trial_days_left: licence.and_then(|licence| licence.trial_days_left),
+            worth_mentioning: licence
+                .map(|licence| licence.worth_mentioning())
+                .unwrap_or(false),
+            evidence,
         }
     }
 

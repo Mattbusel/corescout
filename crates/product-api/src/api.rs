@@ -77,6 +77,11 @@ pub const METHODS: &[(&str, &str)] = &[
         "advise",
         "What to do before an operation, and the trial that goes with it",
     ),
+    ("licence", "What the Microsoft Store says about this copy"),
+    (
+        "worked_out",
+        "What this installation has worked out about this machine",
+    ),
 ];
 
 /// The dispatcher.
@@ -172,7 +177,10 @@ impl Api {
                     ))
                 })?;
                 let mut engine = self.lock();
-                engine.set_autonomy(mode);
+                // Assist and Autopilot are licensed. The refusal has to reach
+                // the caller rather than being discarded, or the setting would
+                // appear to take and then not.
+                engine.set_autonomy(mode)?;
                 engine.persist()?;
                 Ok(json!({ "autonomy": mode.as_str(), "summary": mode.summary() }))
             }
@@ -360,6 +368,15 @@ impl Api {
                 let engine = self.lock();
                 to_value(&engine.open_questions())
             }
+            "licence" => {
+                // Asked rather than cached, because this is the only caller
+                // and it is a person opening a settings page a few times a
+                // year. It costs nothing to be current.
+                let mut engine = self.lock();
+                engine.recheck_licence();
+                to_value(&engine.licence())
+            }
+            "worked_out" => to_value(&self.lock().worked_out()),
             "briefing" => {
                 let engine = self.lock();
                 Ok(json!({ "briefing": briefing(&engine) }))
@@ -377,7 +394,10 @@ impl Api {
     /// nothing gets told so rather than being answered from the nearest thing.
     fn ask(&self, question: &str, params: &Value) -> Result<Value> {
         let text = question.to_lowercase();
-        let engine = self.lock();
+        // Mutable because answering can resolve a machine fault: the check
+        // that a missing path is still missing is also the moment to forget
+        // one that came back.
+        let mut engine = self.lock();
         let subject = params
             .get("operation")
             .and_then(Value::as_str)
@@ -429,20 +449,48 @@ impl Api {
             }));
         }
         if has(&["fail", "failure", "wrong", "broken", "retry", "error"]) {
-            let failures = engine.failures();
-            let relevant: Vec<_> = failures
+            // The machine's own faults first: they are the answer to "why does
+            // this fail here" much more often than any property of the command,
+            // and unlike the counted failure modes they are true on the first
+            // occurrence.
+            let machine = engine.environment_faults();
+            let matches = |fingerprint: &str| subject.map_or(true, |s| fingerprint.contains(s));
+            let relevant: Vec<_> = engine
+                .failures()
                 .into_iter()
-                .filter(|mode| subject.map_or(true, |s| mode.fingerprint.contains(s)))
+                .filter(|mode| matches(&mode.fingerprint))
+                .collect();
+            // Below the bar for calling something a pattern, but not below the
+            // bar for saying it happened. Answering "no" while holding a
+            // verified failure from an hour ago is the behaviour that makes an
+            // agent stop asking.
+            let once: Vec<_> = engine
+                .failures_below_threshold()
+                .into_iter()
+                .filter(|mode| matches(&mode.fingerprint))
                 .collect();
             return Ok(json!({
-                "answer": match relevant.first() {
-                    Some(first) => format!(
+                "answer": match (machine.first(), relevant.first(), once.first()) {
+                    (Some(fault), _, _) => format!(
+                        "Yes, and it is the machine rather than the command. {} \
+                         CoreScout checked just now.",
+                        fault.headline()
+                    ),
+                    (None, Some(first), _) => format!(
                         "Yes. {}. CoreScout has seen this enough times to call it recurring.",
                         first.headline()
                     ),
-                    None => "CoreScout has not seen a recurring failure for that here.".to_string(),
+                    (None, None, Some(first)) => format!(
+                        "Not often enough to call it a pattern, but yes, once: {}. \
+                         Treat it as one report rather than a tendency.",
+                        first.headline()
+                    ),
+                    (None, None, None) =>
+                        "CoreScout has not seen this fail here.".to_string(),
                 },
+                "machine_faults": machine,
                 "failures": relevant,
+                "seen_once": once,
             }));
         }
         if has(&[
@@ -840,6 +888,132 @@ mod tests {
     }
 
     #[test]
+    fn one_report_of_a_missing_path_warns_every_operation_that_would_hit_it() {
+        // The whole point. An agent reported that cargo failed because
+        // CARGO_HOME pointed at a drive that is not there. A different cargo
+        // command, in a later session, must be told: the command was never the
+        // problem, so keying the knowledge to the command loses it.
+        let (_dir, api) = api();
+        let missing = if cfg!(windows) {
+            r"Q:\nowhere\cargo"
+        } else {
+            "/nowhere/at/all/cargo"
+        };
+        api.call(
+            "observe",
+            &json!({
+                "session": "s1",
+                "name": "cargo test -p thing",
+                "kind": "build",
+                "reported": "failure",
+                "exit_code": 101,
+                "detail": format!(
+                    "failed to acquire package cache lock: failed to create directory \
+                     {missing}. CARGO_HOME={missing}, but that drive does not exist."
+                ),
+                "verified": "confirmed",
+            }),
+        )
+        .expect("observe");
+
+        // A different command entirely, which shares nothing but the variable.
+        let advice = api
+            .call(
+                "advise",
+                &json!({"session": "s2", "operation": "cargo build --release -p other"}),
+            )
+            .expect("advise");
+        assert_eq!(
+            advice["has_advice"], true,
+            "one report of a missing path is enough: it is checkable, not statistical"
+        );
+        assert!(
+            advice["because"]
+                .as_str()
+                .expect("because")
+                .contains("CARGO_HOME"),
+            "the advice should name the variable, not the command: {}",
+            advice["because"]
+        );
+        assert_eq!(advice["machine"][0]["path"], missing);
+
+        // And the question an agent actually asks.
+        let answer = api
+            .call("ask", &json!({"question": "why does this keep failing?"}))
+            .expect("ask");
+        assert!(
+            answer["answer"]
+                .as_str()
+                .expect("an answer")
+                .contains("the machine rather than the command"),
+            "{}",
+            answer["answer"]
+        );
+    }
+
+    #[test]
+    fn a_path_that_does_exist_is_not_blamed() {
+        // The expensive mistake is inventing a fault. A failure that mentions a
+        // path which is present must leave nothing behind, or every stack trace
+        // becomes a warning about the machine.
+        let (dir, api) = api();
+        let present = dir.path().display().to_string();
+        api.call(
+            "observe",
+            &json!({
+                "session": "s1",
+                "name": "cargo test",
+                "reported": "failure",
+                "detail": format!("something went wrong in {present} for unrelated reasons"),
+            }),
+        )
+        .expect("observe");
+        let advice = api
+            .call(
+                "advise",
+                &json!({"session": "s2", "operation": "cargo build"}),
+            )
+            .expect("advise");
+        assert_eq!(
+            advice["has_advice"], false,
+            "nothing is missing, so nothing is wrong"
+        );
+        assert!(advice["machine"].as_array().map_or(true, |m| m.is_empty()));
+    }
+
+    #[test]
+    fn a_failure_seen_once_is_offered_as_once_rather_than_withheld() {
+        // Below the recurrence bar, so it must not be called a pattern. But
+        // answering "no" while holding the report is what made an agent stop
+        // asking in the first place.
+        let (_dir, api) = api();
+        api.call(
+            "observe",
+            &json!({
+                "session": "s1",
+                "name": "npm run build",
+                "reported": "failure",
+                "detail": "the bundler ran out of memory",
+            }),
+        )
+        .expect("observe");
+        let answer = api
+            .call(
+                "ask",
+                &json!({"question": "are there failures here?", "operation": "npm run build"}),
+            )
+            .expect("ask");
+        let text = answer["answer"].as_str().expect("an answer");
+        assert!(text.contains("once"), "{text}");
+        assert!(
+            text.contains("rather than a tendency"),
+            "it must not be dressed up as a pattern: {text}"
+        );
+        assert_eq!(answer["failures"].as_array().expect("failures").len(), 0);
+        assert_eq!(answer["seen_once"].as_array().expect("seen_once").len(), 1);
+    }
+
+    #[test]
     fn asking_about_failures_with_nothing_recorded_says_there_are_none() {
         let (_dir, api) = api();
         let answer = api
@@ -851,7 +1025,18 @@ mod tests {
         assert!(answer["answer"]
             .as_str()
             .expect("an answer")
-            .contains("not seen a recurring failure"));
+            .contains("not seen this fail here"));
+        // The three lists are always present, so a caller does not have to
+        // tell "no failures" apart from "the field is missing".
+        assert!(answer["machine_faults"]
+            .as_array()
+            .expect("machine")
+            .is_empty());
+        assert!(answer["failures"].as_array().expect("failures").is_empty());
+        assert!(answer["seen_once"]
+            .as_array()
+            .expect("seen_once")
+            .is_empty());
     }
 
     #[test]

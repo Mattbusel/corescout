@@ -17,12 +17,17 @@
   There are three Applications rather than one. An execution alias names a
   single executable and may be declared once per Application, so putting both
   `corescout` and `corescout-mcp` on the user's path takes an entry each. The
-  two extra ones set AppListEntry="none", so they are on the path and not in
-  the Start menu: nobody wants three CoreScout tiles.
+  All three appear in the Start menu, which is not what anyone would choose.
+  The two console ones were declared AppListEntry="none" so that only the
+  window got a tile, and the Store rejected the package for it: an application
+  with no app list entry is a "headless app", and creating one needs a
+  HeadlessAppBypass waiver that this account does not have. So they are listed,
+  and named so that a person reading the Start menu can tell what they are.
 
-  Identity/Name and Publisher below are placeholders. They come from Partner
-  Center when the app name is reserved, and they must match exactly or the
-  upload is rejected. See docs/STORE.md.
+  Identity/Name and Publisher below are substituted by scripts/msix.ps1, which
+  defaults them to the values Partner Center assigned to this listing. They
+  must match Partner Center exactly or the upload is rejected with a message
+  about signatures rather than about names. See microsoft-store/IDENTITY.md.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -98,16 +103,19 @@
     </Application>
 
     <!-- The command line, on the path, and not in the Start menu. -->
-    <Application Id="CoreScoutCli" Executable="corescout.exe" EntryPoint="Windows.FullTrustApplication">
+    <!-- The payload is corescout-cli.exe, not corescout.exe: Windows filenames
+         are case-insensitive, so a payload named corescout.exe and the window's
+         CoreScout.exe are one file, and whichever is staged second wins. The
+         alias below is still "corescout", which is what a person types. -->
+    <Application Id="CoreScoutCli" Executable="corescout-cli.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        AppListEntry="none"
         DisplayName="CoreScout command line"
         Description="The CoreScout command line."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png" />
       <Extensions>
-        <uap3:Extension Category="windows.appExecutionAlias" Executable="corescout.exe" EntryPoint="Windows.FullTrustApplication">
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="corescout-cli.exe" EntryPoint="Windows.FullTrustApplication">
           <uap3:AppExecutionAlias>
             <desktop:ExecutionAlias Alias="corescout.exe" />
           </uap3:AppExecutionAlias>
@@ -119,7 +127,6 @@
          without an absolute path that changes on every update. -->
     <Application Id="CoreScoutMcp" Executable="corescout-mcp.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        AppListEntry="none"
         DisplayName="CoreScout for AI"
         Description="CoreScout as a Model Context Protocol server."
         BackgroundColor="transparent"

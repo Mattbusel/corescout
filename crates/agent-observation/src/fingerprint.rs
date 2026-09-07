@@ -198,8 +198,23 @@ fn looks_like_a_subcommand(token: &str) -> bool {
     if token.is_empty() || token.len() > 24 {
         return false;
     }
-    if token.contains(['/', '\\', '.', ':', '@', '*']) {
+    if token.contains(['/', '\\', '.', '@', '*']) {
         return false;
+    }
+    // A colon usually means a version or a port, and both vary between runs.
+    // But npm scripts are full of `deploy:staging` and `test:unit`, and
+    // collapsing those to `npm run` merges the build, the tests, the linter
+    // and the deploy of a project into one operation. So a single colon
+    // survives in a token with no digits in it, which keeps script names and
+    // still drops `myimage:v1` and `localhost:8080`.
+    if let Some((head, tail)) = token.split_once(':') {
+        if head.is_empty()
+            || tail.is_empty()
+            || tail.contains(':')
+            || token.bytes().any(|byte| byte.is_ascii_digit())
+        {
+            return false;
+        }
     }
     if token.chars().next().is_some_and(|c| c.is_ascii_digit()) {
         return false;
@@ -212,7 +227,7 @@ fn looks_like_a_subcommand(token: &str) -> bool {
     }
     token
         .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ':')
 }
 
 /// Whether a token is a hex string long enough to be an identifier.
@@ -312,6 +327,28 @@ mod tests {
     fn only_two_subcommands_survive() {
         // Deeper than that and the tail is almost always arguments.
         assert_eq!(normalise("aws s3 cp source dest"), "aws s3 cp");
+    }
+
+    #[test]
+    fn an_npm_script_name_survives_its_colon() {
+        // Found by seeding a realistic project for the Store screenshots:
+        // every `npm run <script>` was collapsing to `npm run`, which merged
+        // the build, the tests, the linter and the deploy of a project into
+        // one operation. That is the over-normalisation failure that invents
+        // patterns, and it would have shipped.
+        assert_eq!(
+            normalise("npm run deploy:staging"),
+            "npm run deploy:staging"
+        );
+        assert!(!same("npm run deploy:staging", "npm run deploy:production"));
+        assert!(!same("npm run test:unit", "npm run test:e2e"));
+    }
+
+    #[test]
+    fn a_version_tag_or_a_port_still_does_not_survive() {
+        // The reason the colon was excluded in the first place.
+        assert!(same("docker run myimage:v1", "docker run myimage:v2"));
+        assert!(same("nc localhost:8080", "nc localhost:9090"));
     }
 
     #[test]

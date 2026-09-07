@@ -48,6 +48,7 @@ corescout-mcp-server = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+ed25519-dalek = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = { workspace = true }

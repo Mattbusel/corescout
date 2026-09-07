@@ -40,6 +40,14 @@ const INTERVAL: Duration = Duration::from_millis(250);
 /// How often learned state is written to disk.
 const PERSIST: Duration = Duration::from_secs(20);
 
+/// How often the Microsoft Store is asked about this copy.
+///
+/// Six hours. The answer changes when a trial ends or somebody asks for a
+/// refund, and neither is worth polling for. Nothing depends on it being
+/// current: the Store enforces the licence, and this only decides what the
+/// Settings screen says.
+const STORE_CHECK: Duration = Duration::from_secs(6 * 60 * 60);
+
 const USAGE: &str = "\
 corescout-service - the part of CoreScout that is always running
 
@@ -116,6 +124,37 @@ fn run() -> Result<()> {
             .name("corescout-mirror".into())
             .spawn(move || observe_loop(engine, stop, ticks))
     });
+
+    {
+        let engine = Arc::clone(&engine);
+        let stop = Arc::clone(&stop);
+        let _ = std::thread::Builder::new()
+            .name("corescout-store".into())
+            .spawn(move || {
+                // Once at startup, because somebody who bought CoreScout
+                // yesterday should not have to wait six hours for it to
+                // notice, and then on the slow cadence.
+                loop {
+                    {
+                        let mut engine = engine
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner());
+                        // Only so Settings can say something true about the
+                        // licence, and so a refund is noticed. Nothing in
+                        // CoreScout is gated on the answer: the Store enforces
+                        // the licence by not letting an unlicensed copy run.
+                        // Failure is silent by design; see the method.
+                        engine.recheck_licence();
+                    }
+                    for _ in 0..(STORE_CHECK.as_secs()) {
+                        if stop.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        std::thread::sleep(Duration::from_secs(1));
+                    }
+                }
+            });
+    }
 
     {
         let engine = Arc::clone(&engine);

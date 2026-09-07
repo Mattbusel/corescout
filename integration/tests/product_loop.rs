@@ -46,8 +46,27 @@ struct World {
 
 impl World {
     fn open() -> World {
+        World::seeded(0x5EED_C0DE_1234_5678)
+    }
+
+    /// A world whose exploration is reproducible.
+    ///
+    /// CoreScout picks its exploration seed from the clock on first run, so
+    /// that two machines do not randomise in lockstep. That is right for the
+    /// product and wrong for a test: several of the tests below assert on how
+    /// often CoreScout chose to explore, and with a fresh seed every run those
+    /// assertions are a coin flip that fails a few times in a hundred. Fixing
+    /// the seed keeps the property under test, which is the policy, and drops
+    /// the part that is not under test, which is the draw.
+    ///
+    /// The seed is written the same way the engine would write it, so nothing
+    /// in the product needs a test-only path.
+    fn seeded(seed: u64) -> World {
         let dir = tempfile::tempdir().expect("a temporary directory");
         let store = Store::open(&dir.path().join("corescout.redb")).expect("a store");
+        store
+            .set_meta("seed", &seed.to_string())
+            .expect("a fixed seed");
         let ring = Ring::open(&dir.path().join("mirror.ring"), 1024).expect("a ring");
         let engine = Engine::open(store, ring).expect("an engine");
         World {
@@ -141,7 +160,26 @@ impl Agent {
             reply["error"].is_null(),
             "{name} failed at the protocol level: {reply}"
         );
-        reply["result"]["structuredContent"].clone()
+        // The protocol says this is an object, and a strict client throws the
+        // whole message away when it is not. Asserted on every tool call the
+        // integration suite makes, because the tools that got this wrong were
+        // the ones nothing here happened to exercise.
+        let structured = reply["result"]["structuredContent"].clone();
+        assert!(
+            structured.is_object(),
+            "{name} answered with something that is not an object: {structured}"
+        );
+        structured
+    }
+
+    /// A tool whose answer is a list, unwrapped from the object carrying it.
+    fn list(&mut self, name: &str, arguments: Value) -> Vec<Value> {
+        let answer = self.tool(name, arguments);
+        let key = name.strip_prefix("corescout_").unwrap_or(name);
+        answer[key]
+            .as_array()
+            .unwrap_or_else(|| panic!("{name} should answer with a list under {key:?}: {answer}"))
+            .clone()
     }
 
     /// The briefing this agent was given when it connected.
@@ -366,9 +404,8 @@ fn what_was_learned_belongs_to_the_machine_rather_than_to_the_model() {
         "the new agent should be told what is available: {briefing}"
     );
 
-    let capabilities = codex.tool("corescout_capabilities", json!({}));
-    let inherited = capabilities.as_array().expect("a list");
-    assert_eq!(inherited.len(), 1, "{capabilities}");
+    let inherited = codex.list("corescout_capabilities", json!({}));
+    assert_eq!(inherited.len(), 1, "{inherited:?}");
     assert_eq!(inherited[0]["id"], procedure);
     assert_eq!(inherited[0]["causal"], true);
 
@@ -378,9 +415,9 @@ fn what_was_learned_belongs_to_the_machine_rather_than_to_the_model() {
 
     // And the failure history, which was recorded while a different model was
     // at the keyboard.
-    let failures = codex.tool("corescout_failures", json!({}));
+    let failures = codex.list("corescout_failures", json!({}));
     assert!(
-        !failures.as_array().expect("a list").is_empty(),
+        !failures.is_empty(),
         "the failure history should outlive the session that produced it"
     );
 

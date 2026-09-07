@@ -157,7 +157,7 @@ impl<B: Backend> Server<B> {
                     );
                 };
                 match self.backend.call(tool.method, &tool.params(&arguments)) {
-                    Ok(value) => reply(id, content(&value, false)),
+                    Ok(value) => reply(id, content(&structured(tool.name, value), false)),
                     // A failed tool is a successful response carrying an
                     // error, so the model reads it and can tell the user.
                     Err(message) => reply(id, content(&json!({ "error": message }), true)),
@@ -169,6 +169,34 @@ impl<B: Backend> Server<B> {
             other => error_reply(id, -32601, &format!("no method {other:?}")),
         }
     }
+}
+
+/// Make a tool's answer into something `structuredContent` may carry.
+///
+/// The protocol says `structuredContent` is an object. Several of these tools
+/// naturally answer with a list -- the failures, the hypotheses, the recent
+/// activity -- and a bare array there is not a lax reading of the schema but a
+/// message a strict client discards whole, which is what Claude Code does. The
+/// tools were unusable rather than degraded, and the text content went with
+/// them, so nothing arrived at all.
+///
+/// The key is the tool's own name with its prefix removed, so `corescout_
+/// failures` answers `{"failures": [...]}`. Deriving it beats a table nobody
+/// updates when a tool is added, and `count` is here because a model that
+/// wants to know whether the list is empty should not have to measure it.
+fn structured(tool: &str, value: Value) -> Value {
+    if value.is_object() {
+        return value;
+    }
+    let key = tool.strip_prefix("corescout_").unwrap_or(tool);
+    let mut object = serde_json::Map::new();
+    // A scalar is as unusable as an array, and rarer, so it gets the same
+    // treatment rather than a second convention to remember.
+    if let Value::Array(items) = &value {
+        object.insert("count".into(), json!(items.len()));
+    }
+    object.insert(key.to_string(), value);
+    Value::Object(object)
 }
 
 /// Wrap a value as tool content.
@@ -243,7 +271,7 @@ mod tests {
         }
     }
 
-    fn ask(server: &mut Server<Recording>, message: Value) -> Value {
+    fn ask<B: Backend>(server: &mut Server<B>, message: Value) -> Value {
         let line = server
             .handle_line(&message.to_string())
             .expect("a reply was expected");
@@ -468,5 +496,72 @@ mod tests {
             .handle_line(&json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}).to_string())
             .expect("a reply");
         assert!(!line.contains('\n'), "a reply must not contain a newline");
+    }
+
+    /// A backend whose answers are lists, like the real one's are.
+    struct Listing;
+
+    impl Backend for Listing {
+        fn connected(&self, _name: &str, _version: Option<&str>) {}
+        fn call(&self, _method: &str, _params: &Value) -> Result<Value, String> {
+            Ok(json!([{ "one": 1 }, { "two": 2 }]))
+        }
+        fn instructions(&self) -> String {
+            String::new()
+        }
+    }
+
+    #[test]
+    fn a_tool_that_answers_with_a_list_still_answers_with_an_object() {
+        // structuredContent is an object by the specification, and a strict
+        // client discards the whole message when it is not, taking the text
+        // content with it. Three tools here answer with lists, and all three
+        // arrived as nothing at all.
+        let mut server = Server::new(Listing);
+        let reply = ask(
+            &mut server,
+            json!({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                   "params":{"name":"corescout_failures","arguments":{}}}),
+        );
+        let structured = &reply["result"]["structuredContent"];
+        assert!(
+            structured.is_object(),
+            "structuredContent must be an object"
+        );
+        assert!(structured["failures"].is_array(), "named for the tool");
+        assert_eq!(structured["count"], 2, "so an empty list is obvious");
+    }
+
+    #[test]
+    fn every_tool_answers_with_an_object_whatever_the_backend_says() {
+        // The one above proves the wrapping works; this one proves no tool is
+        // missed, so a tool added later cannot reintroduce the bug.
+        for tool in tools::TOOLS {
+            let mut server = Server::new(Listing);
+            let reply = ask(
+                &mut server,
+                json!({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                       "params":{"name": tool.name, "arguments":{}}}),
+            );
+            assert!(
+                reply["result"]["structuredContent"].is_object(),
+                "{} answered with something that is not an object",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
+    fn an_object_from_the_backend_is_passed_through_untouched() {
+        // The wrapping must not rename the fields of the tools that were
+        // already correct.
+        let mut server = Server::new(Recording::new());
+        let reply = ask(
+            &mut server,
+            json!({"jsonrpc":"2.0","id":1,"method":"tools/call",
+                   "params":{"name":"corescout_status","arguments":{}}}),
+        );
+        assert_eq!(reply["result"]["structuredContent"]["method"], "status");
+        assert!(reply["result"]["structuredContent"]["status"].is_null());
     }
 }

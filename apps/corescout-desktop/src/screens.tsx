@@ -29,6 +29,7 @@ import {
   type Privacy,
   type Question,
   type Setup,
+  type WorkedOut,
   type Settings as SettingsData,
   type Status,
 } from "./api";
@@ -46,6 +47,7 @@ import {
   useCall,
 } from "./components";
 import { ago, bytes, clock, count, cpuShare, duration, nanos, share } from "./format";
+import { LicenceNotice, Plan } from "./upgrade";
 import { MirrorView, Sparkline } from "./mirror";
 
 /* ------------------------------------------------------------------ home */
@@ -73,7 +75,6 @@ export function Home({ onGo }: { onGo: (screen: string) => void }) {
           <MirrorView
             nodes={live.data.nodes}
             stateId={live.data.state}
-            seen={live.data.seen}
             plain={data.machine.plain}
             unfamiliar={data.machine.unfamiliar}
           />
@@ -526,7 +527,6 @@ export function Computer() {
           <MirrorView
             nodes={live.data.nodes}
             stateId={live.data.state}
-            seen={live.data.seen}
             plain={live.data.plain}
             unfamiliar={false}
           />
@@ -685,25 +685,46 @@ function Knows({
 
 /* ------------------------------------------------------------- settings */
 
-export function Settings({ status }: { status: Status | null }) {
+/** Which part of Settings is open. */
+export type SettingsTab = "general" | "licence" | "privacy" | "diagnostics";
+
+const TAB_NAMES: Record<SettingsTab, string> = {
+  general: "General",
+  licence: "Licence",
+  privacy: "Privacy",
+  diagnostics: "Diagnostics",
+};
+
+export function Settings({
+  status,
+  tab: initial,
+}: {
+  status: Status | null;
+  tab?: SettingsTab;
+}) {
   const settings = useCall<SettingsData>("settings", {}, 4000);
   const privacy = useCall<Privacy>("privacy", {}, 15_000);
   const diagnostics = useCall<Diagnostics>("diagnostics", {}, 5000);
-  const [tab, setTab] = useState<"general" | "privacy" | "diagnostics">("general");
+  const worked = useCall<WorkedOut>("worked_out", {}, 20_000);
+  const [tab, setTab] = useState<SettingsTab>(initial ?? "general");
 
   return (
     <div className="page">
       <h1>Settings</h1>
 
+      <LicenceNotice licence={worked.data} />
+
       <div className="row" style={{ marginBottom: "var(--s5)" }}>
         <div className="toolbar">
-          {(["general", "privacy", "diagnostics"] as const).map((name) => (
+          {(["general", "licence", "privacy", "diagnostics"] as const).map((name) => (
             <button key={name} aria-pressed={tab === name} onClick={() => setTab(name)}>
-              {name === "general" ? "General" : name === "privacy" ? "Privacy" : "Diagnostics"}
+              {TAB_NAMES[name]}
             </button>
           ))}
         </div>
       </div>
+
+      {tab === "licence" ? <Plan /> : null}
 
       {tab === "general" && settings.data ? (
         <>

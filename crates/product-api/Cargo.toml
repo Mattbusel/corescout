@@ -19,6 +19,7 @@ corescout-selfmodel = { workspace = true }
 corescout-identity = { workspace = true }
 corescout-storage = { workspace = true }
 corescout-permissions = { workspace = true }
+corescout-store-commerce = { workspace = true }
 corescout-agent-observation = { workspace = true }
 corescout-agent-experience = { workspace = true }
 corescout-capability-runtime = { workspace = true }

@@ -75,6 +75,12 @@ export async function setLaunchAtLogin(enabled: boolean): Promise<Startup | null
   return (await shell("set_launch_at_login", { enabled })) as Startup | null;
 }
 
+/** Open a link in the user's own browser, or the Store. */
+export async function openExternal(url: string): Promise<void> {
+  await shell("open_external", { url });
+}
+
+
 /** Open the folder CoreScout keeps its data in. */
 export async function revealDataFolder(): Promise<void> {
   await shell("reveal_data_folder");
@@ -253,6 +259,28 @@ export interface Machine {
   self_description: string[];
 }
 
+/**
+ * What the Microsoft Store says about this copy.
+ *
+ * `null` when this build was not installed from the Store, which is every
+ * development build. Nothing in the interface behaves differently: the Store
+ * enforces the licence by not letting an unlicensed copy run.
+ */
+export type Licence = {
+  active: boolean;
+  trial: boolean;
+  trial_days_left: number | null;
+} | null;
+
+/** What this installation has worked out, and one line about the licence. */
+export interface WorkedOut {
+  headline: string;
+  trial: boolean;
+  trial_days_left: number | null;
+  worth_mentioning: boolean;
+  evidence: { value: string; label: string }[];
+}
+
 export interface Settings {
   autonomy: string;
   autonomy_title: string;
@@ -315,6 +343,16 @@ function fixture(method: string): Json {
       return [];
     case "setup":
       return [];
+    case "licence":
+      return null satisfies Licence;
+    case "worked_out":
+      return {
+        headline: "CoreScout is not running.",
+        trial: false,
+        trial_days_left: null,
+        worth_mentioning: false,
+        evidence: [],
+      } satisfies WorkedOut;
     case "live":
       return { plain: "No service.", seen: 0, nodes: [], trail: [], recent_states: [], agent_activity: [] };
     default:

@@ -35,11 +35,13 @@
 
 #![deny(missing_docs)]
 
+pub mod environment;
 pub mod experience;
 pub mod failure;
 pub mod pattern;
 pub mod procedure;
 
+pub use environment::{Blamed, Environment, Fault};
 pub use experience::{Experience, Thresholds};
 pub use failure::FailureMode;
 pub use pattern::{Basis, Pattern, Subject};

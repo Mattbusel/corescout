@@ -29,9 +29,12 @@
 #>
 [CmdletBinding()]
 param(
-    [string] $IdentityName = "CoreScout",
-    [string] $Publisher = "CN=CoreScout",
-    [string] $PublisherDisplayName = "CoreScout",
+    # Defaulted to what Partner Center assigned to this listing, so an
+    # ordinary build produces an uploadable package. They are public values:
+    # they are in the Store URL and in every copy of the shipped package.
+    [string] $IdentityName = "Tensorust.CoreScout",
+    [string] $Publisher = "CN=98B77C5C-8582-4364-B50E-0922AE25FBF6",
+    [string] $PublisherDisplayName = "Tensorust",
     [string] $Sign,
     [string] $OutDir = "dist"
 )
@@ -73,9 +76,33 @@ $desktop = Join-Path $root "apps\corescout-desktop"
 $built = Join-Path $desktop "src-tauri\target\release"
 
 # The window, and the three programs it depends on.
-Copy-Item (Join-Path $built "corescout-desktop.exe") (Join-Path $stage "CoreScout.exe") -Force
-foreach ($name in @("corescout.exe", "corescout-service.exe", "corescout-mcp.exe")) {
-    Copy-Item (Join-Path $built $name) (Join-Path $stage $name) -Force
+#
+# The command line tool is staged as corescout-cli.exe. It cannot be staged as
+# corescout.exe: Windows filenames are case-insensitive, so that and the
+# window's CoreScout.exe are the same file, and the second copy silently
+# replaces the first. The manifest gives it the execution alias "corescout",
+# so what a person types is unchanged.
+$payload = @{
+    "corescout-desktop.exe" = "CoreScout.exe"
+    "corescout.exe"         = "corescout-cli.exe"
+    "corescout-service.exe" = "corescout-service.exe"
+    "corescout-mcp.exe"     = "corescout-mcp.exe"
+}
+foreach ($from in $payload.Keys) {
+    $source = Join-Path $built $from
+    if (-not (Test-Path $source)) { throw "$from was not built; expected it in $built" }
+    Copy-Item $source (Join-Path $stage $payload[$from]) -Force
+}
+
+# And prove it, because the failure this guards against is silent: MakeAppx
+# packs whatever is in the folder and the manifest resolves names
+# case-insensitively, so a collision produces a package that builds, installs,
+# and launches the wrong program.
+$staged = Get-ChildItem $stage -File | Select-Object -ExpandProperty Name
+$collisions = $staged | Group-Object { $_.ToLowerInvariant() } | Where-Object { $_.Count -gt 1 }
+if ($collisions) { throw "two payload files differ only by case: $($collisions.Name -join ', ')" }
+if ($staged.Count -ne $payload.Count) {
+    throw "expected $($payload.Count) programs in $stage, found $($staged.Count): $($staged -join ', ')"
 }
 
 # Every tile the manifest names. A missing one fails MakeAppx with a message
@@ -125,9 +152,12 @@ $hash = (Get-FileHash $package -Algorithm SHA256).Hash.ToLower()
 Write-Host ""
 Write-Host ("{0}  {1:N0} KB" -f $package, ((Get-Item $package).Length / 1KB)) -ForegroundColor Green
 
-if ($IdentityName -eq "CoreScout") {
+if ($IdentityName -notmatch '^[^.]+\.[^.]+') {
     Write-Host ""
-    Write-Host "The identity is the placeholder, so the Store will reject this." -ForegroundColor Yellow
-    Write-Host "Reserve the name in Partner Center and pass -IdentityName and -Publisher." -ForegroundColor Yellow
-    Write-Host "docs/STORE.md has the whole sequence." -ForegroundColor Yellow
+    Write-Host "The identity does not look like a Partner Center one, so the Store will reject this." -ForegroundColor Yellow
+    Write-Host "microsoft-store/IDENTITY.md has the values for this listing." -ForegroundColor Yellow
+} else {
+    Write-Host ""
+    Write-Host "Identity: $IdentityName / $Publisher" -ForegroundColor Green
+    Write-Host "Upload this to Partner Center. It is unsigned on purpose." -ForegroundColor Green
 }

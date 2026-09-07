@@ -1,7 +1,7 @@
 {
   "name": "corescout-website",
   "private": true,
-  "version": "0.3.0",
+  "version": "1.0.0",
   "scripts": {
     "dev": "next dev -p 5184",
     "build": "next build",

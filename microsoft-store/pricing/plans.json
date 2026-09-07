@@ -1,0 +1,38 @@
+﻿[
+  {
+    "id": "pro-monthly",
+    "name": "CoreScout Pro",
+    "tier": "pro",
+    "price_usd": 49,
+    "period": "monthly",
+    "token": "corescout.pro.monthly",
+    "summary": "Everything CoreScout can learn about one machine, kept learning.",
+    "best_for": "One person, one machine.",
+    "call_to_action": "Subscribe",
+    "featured": false
+  },
+  {
+    "id": "pro-yearly",
+    "name": "CoreScout Pro",
+    "tier": "pro",
+    "price_usd": 399,
+    "period": "yearly",
+    "token": "corescout.pro.yearly",
+    "summary": "The same, billed once a year.",
+    "best_for": "One person who has decided.",
+    "call_to_action": "Subscribe yearly",
+    "featured": true
+  },
+  {
+    "id": "lifetime",
+    "name": "CoreScout Lifetime",
+    "tier": "pro",
+    "price_usd": 999,
+    "period": "once",
+    "token": "corescout.lifetime",
+    "summary": "Pay once. It keeps working, including every update.",
+    "best_for": "Anyone who would rather not think about it again.",
+    "call_to_action": "Buy once",
+    "featured": false
+  }
+]

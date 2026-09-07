@@ -41,6 +41,16 @@ pub fn cli_command() -> String {
 /// on it would otherwise have an agent talking to whichever one the path
 /// happened to name, which is the most confusing failure available here.
 fn beside(name: &str) -> String {
+    // A packaged installation is the exception. Its binaries live under
+    // WindowsApps, a directory that is ACL-restricted, unreadable to the
+    // agent being configured, and renamed on every update -- so a
+    // configuration file holding that path works until the first update and
+    // then silently stops. The package declares execution aliases precisely
+    // so the bare name resolves, and the bare name is what survives.
+    if corescout_storage::packaged::family_name().is_some() {
+        return name.to_string();
+    }
+
     let file = if cfg!(windows) {
         format!("{name}.exe")
     } else {

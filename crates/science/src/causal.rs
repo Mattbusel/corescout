@@ -215,6 +215,13 @@ pub enum Insufficient {
 impl Insufficient {
     pub fn describe(&self) -> String {
         match self {
+            // Zero is its own case. "0 trials, none randomised: the action was
+            // always chosen for a reason" describes trials that never
+            // happened, which reads as a broken sentence and, worse, implies
+            // CoreScout looked and found confounding where it has not looked.
+            Insufficient::NoRandomisation {
+                observational_trials: 0,
+            } => "not tried under randomised assignment yet, so there is nothing to compare".into(),
             Insufficient::NoRandomisation {
                 observational_trials,
             } => format!(
@@ -1061,5 +1068,32 @@ mod forgetting_tests {
     fn an_attribution_forgets_by_default_and_can_be_told_not_to() {
         assert!(Attribution::new().forgetting_factor() < 1.0);
         assert_eq!(Attribution::remembering().forgetting_factor(), 1.0);
+    }
+}
+
+#[cfg(test)]
+mod zero_trials {
+    use super::*;
+
+    /// With nothing tried, CoreScout has not discovered confounding; it has
+    /// not looked. Saying "the action was always chosen for a reason" about
+    /// zero trials claims a finding it does not have.
+    #[test]
+    fn nothing_tried_is_not_the_same_as_tried_and_confounded() {
+        let nothing = Insufficient::NoRandomisation {
+            observational_trials: 0,
+        }
+        .describe();
+        assert!(!nothing.starts_with('0'), "{nothing}");
+        assert!(!nothing.contains("chosen for a reason"), "{nothing}");
+        assert!(nothing.contains("yet"), "{nothing}");
+
+        // One trial still gets the confounding explanation, because there it
+        // is true: something was tried, and it was not randomised.
+        let some = Insufficient::NoRandomisation {
+            observational_trials: 7,
+        }
+        .describe();
+        assert!(some.contains("chosen for a reason"), "{some}");
     }
 }

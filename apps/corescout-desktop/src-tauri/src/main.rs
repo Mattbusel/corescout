@@ -68,6 +68,36 @@ fn set_launch_at_login(enabled: bool) -> Result<startup::Startup, String> {
     Ok(startup::state())
 }
 
+/// Open a link in the user's own browser, or a Store page in the Store.
+///
+/// Refuses anything that is not a link. The window cannot run programs, and a
+/// command that took an arbitrary string and handed it to the shell would be
+/// exactly the way to give it that ability by accident.
+#[tauri::command]
+fn open_external(url: String) -> Result<(), String> {
+    const ALLOWED: [&str; 3] = ["https://", "ms-windows-store://", "mailto:"];
+    if !ALLOWED.iter().any(|prefix| url.starts_with(prefix)) {
+        return Err(format!("{url} is not a link CoreScout will open"));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        // Through the shell's own URL handler, with the URL as an argument
+        // rather than as part of a command line.
+        std::process::Command::new("rundll32.exe")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = &url;
+    }
+    Ok(())
+}
+
 /// Open the folder CoreScout keeps its data in.
 ///
 /// The Privacy page names the path; this is the button next to it. Showing
@@ -98,7 +128,8 @@ fn main() {
             corescout_call,
             launch_at_login,
             set_launch_at_login,
-            reveal_data_folder
+            reveal_data_folder,
+            open_external
         ])
         .setup(|app| {
             {

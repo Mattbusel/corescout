@@ -131,6 +131,13 @@ pub struct Experience {
     /// Candidate patterns that failed a threshold. Shown in the interface so
     /// the bars are visible rather than implied.
     pub rejected: u64,
+    /// Faults belonging to the machine rather than to any operation.
+    ///
+    /// Held here so it is persisted with everything else, but deliberately not
+    /// subject to [`Thresholds`]: see [`crate::environment`] for why a missing
+    /// drive is not the kind of claim that needs samples.
+    #[serde(default)]
+    pub environment: crate::environment::Environment,
 }
 
 #[derive(Clone, Debug, PartialEq)]
