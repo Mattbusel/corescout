@@ -1,0 +1,18 @@
+[package]
+name = "corescout-service"
+description = "The CoreScout background service: observes the machine, learns, and answers the local API."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "corescout-service"
+path = "src/main.rs"
+
+[dependencies]
+corescout-core = { workspace = true }
+corescout-substrate = { workspace = true }
+corescout-storage = { workspace = true }
+corescout-product-api = { workspace = true }

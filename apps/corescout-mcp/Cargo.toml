@@ -1,0 +1,17 @@
+[package]
+name = "corescout-mcp"
+description = "CoreScout as a Model Context Protocol server, so any compatible AI can use what this computer has learned."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "corescout-mcp"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { workspace = true }
+corescout-mcp-server = { workspace = true }
+corescout-product-api = { workspace = true }

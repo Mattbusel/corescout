@@ -1,0 +1,14 @@
+[package]
+name = "corescout-agent-experience"
+description = "Operational patterns learned from watching agents work, with association kept separate from causal evidence."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-science = { workspace = true }
+corescout-agent-observation = { workspace = true }

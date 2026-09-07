@@ -7,7 +7,7 @@
 use std::process::Command;
 
 fn corescout(args: &[&str]) -> (i32, String, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_corescout"))
+    let output = Command::new(env!("CARGO_BIN_EXE_corescout-lab"))
         .args(args)
         .output()
         .expect("run corescout");

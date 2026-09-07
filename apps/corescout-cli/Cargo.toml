@@ -1,0 +1,17 @@
+[package]
+name = "corescout-cli"
+description = "The CoreScout command line."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "corescout"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-product-api = { workspace = true }

@@ -102,8 +102,6 @@ pub fn extract(frames: &[MirrorSnapshot]) -> Features {
     }
 
     let channels = &frames[0].channels;
-    let cols = channels.len();
-    let entities = frames[0].entities.len();
     for channel in channels {
         match channel.semantics {
             Semantics::Cumulative => features.differenced += 1,
@@ -113,59 +111,75 @@ pub fn extract(frames: &[MirrorSnapshot]) -> Features {
 
     for index in 1..frames.len() {
         let current = &frames[index];
-        let previous = &frames[index - 1];
-
-        // Rows are only comparable within an epoch.
-        if current.epoch != previous.epoch
-            || current.channels.len() != cols
-            || current.entities.len() != entities
-        {
-            features.dropped += 1;
-            continue;
-        }
-        let elapsed_ns = current.monotonic_ns.saturating_sub(previous.monotonic_ns);
-        if elapsed_ns == 0 {
-            // Two reflections at the same instant: a rate would be a division
-            // by zero, and the second carries no new information anyway.
-            features.dropped += 1;
-            continue;
-        }
-        let seconds = elapsed_ns as f64 / 1e9;
-
-        let mut row = Vec::with_capacity(entities * cols);
-        for entity in 0..entities {
-            for (col, channel) in current.channels.iter().enumerate() {
-                let now = current.state.get(entity, col);
-                let value = match channel.semantics {
-                    Semantics::Cumulative => {
-                        let before = previous.state.get(entity, col);
-                        if now.is_finite() && before.is_finite() {
-                            let delta = now - before;
-                            // A counter that went backwards wrapped, or the
-                            // machine restarted. Either way the difference is
-                            // not a rate, and inventing one would put a huge
-                            // spike into the feature that a learner would then
-                            // treat as a state.
-                            if delta < 0.0 {
-                                f64::NAN
-                            } else {
-                                delta / seconds
-                            }
-                        } else {
-                            f64::NAN
-                        }
-                    }
-                    _ => now,
-                };
-                row.push(value);
+        match row_from(&frames[index - 1], current) {
+            Some(row) => {
+                features.rows.push(row);
+                features.times_ns.push(current.monotonic_ns);
             }
+            None => features.dropped += 1,
         }
-        features.rows.push(row);
-        features.times_ns.push(current.monotonic_ns);
     }
     // The first reflection never becomes a row.
     features.dropped += 1;
     features
+}
+
+/// Build one feature row from a consecutive pair of reflections.
+///
+/// The incremental form of [`extract`], for a consumer that sees reflections
+/// as they arrive rather than as a batch. Both go through this function, so a
+/// service watching a live plane and a tool replaying a recording produce
+/// identical rows from identical input, which is the property that makes a
+/// recorded trace a usable stand-in for a live machine.
+///
+/// `None` when the pair cannot produce a rate: a different epoch, a changed
+/// shape, or no time between them.
+pub fn row_from(previous: &MirrorSnapshot, current: &MirrorSnapshot) -> Option<Vec<f64>> {
+    let cols = current.channels.len();
+    let entities = current.entities.len();
+    // Rows are only comparable within an epoch and within one shape.
+    if current.epoch != previous.epoch
+        || previous.channels.len() != cols
+        || previous.entities.len() != entities
+    {
+        return None;
+    }
+    let elapsed_ns = current.monotonic_ns.saturating_sub(previous.monotonic_ns);
+    if elapsed_ns == 0 {
+        // Two reflections at the same instant: a rate would be a division by
+        // zero, and the second carries no new information anyway.
+        return None;
+    }
+    let seconds = elapsed_ns as f64 / 1e9;
+
+    let mut row = Vec::with_capacity(entities * cols);
+    for entity in 0..entities {
+        for (col, channel) in current.channels.iter().enumerate() {
+            let now = current.state.get(entity, col);
+            let value = match channel.semantics {
+                Semantics::Cumulative => {
+                    let before = previous.state.get(entity, col);
+                    if now.is_finite() && before.is_finite() {
+                        let delta = now - before;
+                        // A counter that went backwards wrapped, or the machine
+                        // restarted. Either way the difference is not a rate,
+                        // and inventing one would put a huge spike into the
+                        // feature that a learner would then treat as a state.
+                        if delta < 0.0 {
+                            f64::NAN
+                        } else {
+                            delta / seconds
+                        }
+                    } else {
+                        f64::NAN
+                    }
+                }
+                _ => now,
+            };
+            row.push(value);
+        }
+    }
+    Some(row)
 }
 
 #[cfg(test)]

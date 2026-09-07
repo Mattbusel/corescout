@@ -10,8 +10,11 @@ readme = "../../README.md"
 keywords = ["cpu", "introspection", "self-model", "telemetry", "scheduling"]
 categories = ["command-line-utilities", "hardware-support"]
 
+# The research command line. The product command line is `corescout`, in
+# `apps/corescout-cli`; this one is the laboratory it grew out of, and keeps
+# every experiment the papers in `docs/` refer to.
 [[bin]]
-name = "corescout"
+name = "corescout-lab"
 path = "src/main.rs"
 
 # `mirror-daemon` and `mirror-agent` live here because they need hardware: one

@@ -2,6 +2,13 @@
 resolver = "2"
 members = [
     "crates/core",
+    "crates/storage",
+    "crates/permissions",
+    "crates/agent-observation",
+    "crates/agent-experience",
+    "crates/capability-runtime",
+    "crates/product-api",
+    "crates/mcp-server",
     "crates/mirror",
     "crates/substrate",
     "crates/memory",
@@ -23,8 +30,17 @@ members = [
     "crates/report",
     "apps/corescout",
     "apps/mirror-tools",
+    "apps/corescout-service",
+    "apps/corescout-mcp",
+    "apps/corescout-cli",
     "integration",
 ]
+
+# The desktop shell is a Tauri application with a dependency tree an order of
+# magnitude larger than everything else here. Keeping it out of the workspace
+# means `cargo test` at the root still builds and runs in seconds, which is the
+# difference between gates that get run and gates that get skipped.
+exclude = ["apps/corescout-desktop/src-tauri"]
 
 [workspace.package]
 version = "0.2.0"
@@ -37,6 +53,8 @@ repository = "https://github.com/mattbusel/corescout"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 libc = "0.2"
+redb = "2"
+tempfile = "3"
 windows-sys = { version = "0.52", features = [
     "Win32_Foundation",
     "Win32_System_SystemInformation",
@@ -66,6 +84,13 @@ corescout-analysis = { path = "crates/analysis" }
 corescout-autonomy = { path = "crates/autonomy" }
 corescout-human = { path = "crates/human" }
 corescout-report = { path = "crates/report" }
+corescout-storage = { path = "crates/storage" }
+corescout-permissions = { path = "crates/permissions" }
+corescout-agent-observation = { path = "crates/agent-observation" }
+corescout-agent-experience = { path = "crates/agent-experience" }
+corescout-capability-runtime = { path = "crates/capability-runtime" }
+corescout-product-api = { path = "crates/product-api" }
+corescout-mcp-server = { path = "crates/mcp-server" }
 
 [profile.release]
 # The benchmark workloads in `experiment` are part of the measurement

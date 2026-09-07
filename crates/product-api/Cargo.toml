@@ -1,0 +1,28 @@
+[package]
+name = "corescout-product-api"
+description = "The product engine: everything CoreScout knows, the local API over it, and the client that speaks to it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-mirror = { workspace = true }
+corescout-substrate = { workspace = true }
+corescout-represent = { workspace = true }
+corescout-science = { workspace = true }
+corescout-selfmodel = { workspace = true }
+corescout-identity = { workspace = true }
+corescout-storage = { workspace = true }
+corescout-permissions = { workspace = true }
+corescout-agent-observation = { workspace = true }
+corescout-agent-experience = { workspace = true }
+corescout-capability-runtime = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+corescout-memory = { workspace = true }
