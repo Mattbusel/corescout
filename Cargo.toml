@@ -9,6 +9,7 @@ members = [
     "crates/science",
     "crates/concept",
     "crates/capability",
+    "crates/lineage",
     "crates/selfmodel",
     "crates/identity",
     "crates/intent",
@@ -44,6 +45,7 @@ corescout-represent = { path = "crates/represent" }
 corescout-science = { path = "crates/science" }
 corescout-concept = { path = "crates/concept" }
 corescout-capability = { path = "crates/capability" }
+corescout-lineage = { path = "crates/lineage" }
 corescout-selfmodel = { path = "crates/selfmodel" }
 corescout-identity = { path = "crates/identity" }
 corescout-intent = { path = "crates/intent" }

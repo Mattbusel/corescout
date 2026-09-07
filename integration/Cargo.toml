@@ -25,6 +25,8 @@ corescout-memory = { workspace = true }
 corescout-represent = { workspace = true }
 corescout-science = { workspace = true }
 corescout-concept = { workspace = true }
+corescout-capability = { workspace = true }
+corescout-lineage = { workspace = true }
 corescout-selfmodel = { workspace = true }
 corescout-identity = { workspace = true }
 corescout-intent = { workspace = true }

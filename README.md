@@ -544,6 +544,44 @@ it is cheaper. It is faster because it is credulous, and this environment does
 not punish credulity hard enough to show it. That comparison is reported rather
 than tuned away; see `docs/AGENCY.md`.
 
+### Does the same silicon end up doing more work?
+
+The economic question underneath the rest: can compute be spent to manufacture
+*more effective compute*? Measured as verified useful work per scarce physical
+input, on workloads never practised on, net of what the search cost:
+
+```text
+lineage                          net Q trained   net Q held-out
+  G0  inherited nothing              0.000377        0.000383
+  G1  inherited 14 configs           0.000454        0.000457
+  G2  inherited 28                   0.000541        0.000533
+  G3  inherited 42                   0.000631        0.000610
+                                                     +59.4%
+
+control (searches identically, keeps nothing)
+  G0 -> G3                           0.000276        0.000275   flat
+
+attributable to learning: 61.6%
+```
+
+The control is the result. It spends identical silicon searching and discards
+the answer, so anything it also gained would have been the substrate rather than
+the runtime. It gained nothing.
+
+`Q` is the number the project would be judged by, which makes it the number most
+worth faking, so the ledger was built adversarially before the mechanism:
+unverified work is worth **zero** and still costs, search is charged to whoever
+inherits the gain, held-out work is accounted separately, and the weights that
+price scarce inputs come from outside. `Verdict` can return
+`LearnedTheBenchmark`, `SearchCostTooHigh` and `Untrustworthy`, and a harness
+that cannot return those is not measuring anything.
+
+The first run of this experiment produced a *declining* Q, because the space was
+small enough that G0 solved it outright and every later generation kept paying
+for searches that found nothing. That is correct accounting describing a badly
+designed process, and the fix was a harder space rather than a kinder ledger.
+`docs/CAPITAL.md` has the full account, including what it does not establish.
+
 ### When is the causal bar worth paying for?
 
 The previous result had the correlational agent winning, which was fair and
@@ -732,6 +770,8 @@ crates/
   represent/      normalisation, correlation, discovered latent states
   science/        hypothesis, experiment, falsification, causal attribution
   concept/        coined concepts, portable signatures, virtual resources
+  capability/     the atlas G=(S,A,T): concepts, affordances, capabilities
+  lineage/        productivity accounting across generations
   selfmodel/      prediction of the next reflection, with uncertainty
   identity/       self-boundary inference; what the machine may say of itself
   intent/         outcomes, not mechanisms

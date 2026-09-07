@@ -1,0 +1,14 @@
+[package]
+name = "corescout-lineage"
+description = "Productivity accounting for a lineage of self-modified runtimes: useful work per scarce physical input, honestly."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+corescout-core = { workspace = true }
+corescout-capability = { workspace = true }

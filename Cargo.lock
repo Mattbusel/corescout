@@ -171,6 +171,7 @@ dependencies = [
  "corescout-agency",
  "corescout-analysis",
  "corescout-autonomy",
+ "corescout-capability",
  "corescout-concept",
  "corescout-core",
  "corescout-counterfactual",
@@ -178,6 +179,7 @@ dependencies = [
  "corescout-human",
  "corescout-identity",
  "corescout-intent",
+ "corescout-lineage",
  "corescout-memory",
  "corescout-mirror",
  "corescout-observer",
@@ -195,6 +197,16 @@ dependencies = [
 name = "corescout-intent"
 version = "0.2.0"
 dependencies = [
+ "corescout-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "corescout-lineage"
+version = "0.2.0"
+dependencies = [
+ "corescout-capability",
  "corescout-core",
  "serde",
  "serde_json",

@@ -692,3 +692,69 @@ until that number exists.
 | exploration regret exceeds any gain on real hardware | not deployable, whatever it demonstrates in simulation |
 
 None of these is currently ruled out.
+
+---
+
+## 15. Questions opened by the capital framing
+
+### 15.1 Does real silicon contain exploitable general structure?
+
+The lineage experiment plants a general optimum and shows a line can compound
+toward it. Everything depends on whether a real machine has an analogous thing:
+a configuration structure that transfers across workloads and is not already
+found by the vendor's defaults.
+
+**Open, and it decides whether any of this matters.** If real machines are
+mostly at their optimum already, the ceiling is small and no amount of clever
+searching reaches it.
+
+### 15.2 When should a lineage stop searching?
+
+The first run of the experiment declined because every generation kept spending
+its search budget after the gains had stopped, while the inherited bill grew.
+Correct accounting, badly designed process.
+
+**Open.** Nothing in the crate provides a stopping rule. The obvious candidate
+is to stop when the marginal gain of the last search falls below its cost, which
+requires estimating a marginal gain that has not been measured yet.
+
+### 15.3 What is a descendant, concretely?
+
+Here a descendant is a configuration vector. That is the weakest possible form
+of the idea and it is the form that could be honestly measured.
+
+**Open:** compiling learned experience into an actually rebuilt runtime is a far
+larger piece of work, and the gap between a configuration and a runtime is where
+most of the difficulty lives. Until that is crossed, "self-modified runtime"
+overstates what exists.
+
+### 15.4 Does the gain survive being priced in energy?
+
+The default weights price silicon time only, honestly, because most machines
+cannot read their own power. A descendant that is faster and hungrier might be
+worse by the measure an operator actually pays.
+
+**Open,** and it needs RAPL on a real machine.
+
+### 15.5 Does a lineage's rate of improvement itself improve?
+
+The interesting version of the claim is `dQ/dt` rising, not just `Q`. In the
+experiment each generation gains roughly as much as the last, which is what hill
+climbing on a fixed landscape produces.
+
+**Open:** a lineage whose accumulated atlas made its *searching* cheaper would
+show acceleration. Nothing currently connects the atlas to the search.
+
+---
+
+## 16. Additions to "things that would change our mind"
+
+| finding | what it would mean |
+|---|---|
+| real machines sit near their configuration optimum already | the ceiling is small; the process cannot pay for itself |
+| gains vanish once energy is priced | the descendant is faster and more expensive, which operators will not want |
+| no stopping rule beats "search once and stop" | the compounding story collapses to a single one-off tuning pass |
+| held-out gains never materialise on real workloads | the process learns benchmarks, which is the failure the harness was built to catch |
+| the rate of improvement is flat across many generations | it is tuning, not capital formation, and the recursive framing is wrong |
+
+None of these is currently ruled out.
