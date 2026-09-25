@@ -5,8 +5,8 @@
 CoreScout watches how your machine and your AI work together, remembers what
 reality teaches them, and turns useful discoveries into better ways of working.
 
-[**Download CoreScout for Windows**](https://github.com/mattbusel/corescout/releases/latest)
-&nbsp;·&nbsp; Free. Open source. Local-first.
+Free. Open source. Local-first. Rust, with a Tauri desktop app and an MCP server for your AI client.
+[Browser preview of the interface](https://corescout-desktop.vercel.app) (no real data; the real thing runs on your machine).
 
 ---
 
@@ -25,8 +25,8 @@ computer, and computers do not learn from their own experience.
 ## What CoreScout does
 
 1. **Sees.** It observes the machine several times a second, and observes what
-   your AI does to it: commands, exit codes, files touched, retries, and — the
-   part that matters most — whether anything actually checked the result.
+   your AI does to it: commands, exit codes, files touched, retries, and (the
+   part that matters most) whether anything actually checked the result.
 2. **Learns.** It notices what recurs. Which operations fail here, what the
    runs that worked had in common, which state the machine was in at the time.
 3. **Verifies.** Then it does the part almost nobody does. A correlation is not
@@ -34,15 +34,17 @@ computer, and computers do not learn from their own experience.
    rather than by belief, and only those trials support a claim that one thing
    causes another.
 4. **Improves.** What survives becomes a capability, with its evidence
-   attached. You approve it. Your AI can then use it — and so can the next AI
+   attached. You approve it. Your AI can then use it, and so can the next AI
    you connect, because what was learned belongs to the machine.
 
 Everything stays on your computer. No account, no server, no telemetry.
 
 ## Install
 
-Download [`CoreScoutSetup.exe`](https://github.com/mattbusel/corescout/releases/latest),
-run it, and open CoreScout. Windows 10 and 11, 64-bit.
+Windows 10 and 11, 64-bit. No installer has been published to GitHub Releases
+yet, so for now build it from source: `pwsh scripts/release.ps1` writes
+`CoreScoutSetup.exe` into `dist/` (details in [WINDOWS.md](docs/WINDOWS.md)).
+Run it and open CoreScout.
 
 The installer is not signed, so SmartScreen will object; **More info** →
 **Run anyway**, or check the published SHA-256 first. It needs no
@@ -118,7 +120,7 @@ Four modes, and you can change them at any time.
 | **Assist** | Makes small reversible changes on its own. Anything bigger waits for you. |
 | **Autopilot** | Applies changes it has verified, inside limits you set. |
 
-Raising the mode never widens what CoreScout may touch — that is a separate
+Raising the mode never widens what CoreScout may touch; that is a separate
 setting, and no mode overrides it. There is a **Pause** that stops everything
 immediately, and it is checked before anything else in the system. See
 [SECURITY.md](docs/SECURITY.md).
@@ -165,21 +167,21 @@ bounded changes             scoped, reversible, audited, visible
 your machine again
 ```
 
-- [PRODUCT.md](docs/PRODUCT.md) — what each screen is for and why it is worded that way
-- [DEMO.md](docs/DEMO.md) — a real trap, built for real, with and without an experienced computer
-- [MCP.md](docs/MCP.md) — the tools your AI gets, and how to connect one
-- [CAPABILITIES.md](docs/CAPABILITIES.md) — how a correlation becomes something runnable
-- [PRIVACY.md](docs/PRIVACY.md) — everything that is stored, and where
-- [SECURITY.md](docs/SECURITY.md) — the boundaries, and how they are enforced
-- [WINDOWS.md](docs/WINDOWS.md) — building, packaging, signing
-- [STORE.md](docs/STORE.md) — the Microsoft Store package, and what a submission needs
-- [ARCHITECTURE_PRODUCT.md](docs/ARCHITECTURE_PRODUCT.md) — the product layers and the rules they follow
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — the research crate graph and what each layer may not do
+- [PRODUCT.md](docs/PRODUCT.md): what each screen is for and why it is worded that way
+- [DEMO.md](docs/DEMO.md): a real trap, built for real, with and without an experienced computer
+- [MCP.md](docs/MCP.md): the tools your AI gets, and how to connect one
+- [CAPABILITIES.md](docs/CAPABILITIES.md): how a correlation becomes something runnable
+- [PRIVACY.md](docs/PRIVACY.md): everything that is stored, and where
+- [SECURITY.md](docs/SECURITY.md): the boundaries, and how they are enforced
+- [WINDOWS.md](docs/WINDOWS.md): building, packaging, signing
+- [STORE.md](docs/STORE.md): the Microsoft Store package, and what a submission needs
+- [ARCHITECTURE_PRODUCT.md](docs/ARCHITECTURE_PRODUCT.md): the product layers and the rules they follow
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): the research crate graph and what each layer may not do
 
 ## A real machine
 
-The first time this ran on hardware — a 13th Gen Intel Core i7-13700KF, 16
-physical cores, 24 logical — over 900 reflections in 36 seconds:
+The first time this ran on hardware (a 13th Gen Intel Core i7-13700KF, 16
+physical cores, 24 logical), it made over 900 reflections in 36 seconds:
 
 ```text
 86 observable parts × 9 channels
@@ -208,11 +210,11 @@ association held apart from causal evidence, beliefs withdrawn when the
 evidence ages out. All of that is still here and still runs, under
 `corescout-lab`.
 
-- [MIRROR.md](docs/MIRROR.md) — the primitive everything sits on
-- [SCIENCE.md](docs/SCIENCE.md) — falsification, and what makes a claim risky
-- [CREDULITY.md](docs/CREDULITY.md) — where acting on a correlation is dangerous
-- [ONTOLOGY.md](docs/ONTOLOGY.md) — concepts a machine coins for itself
-- [RESEARCH.md](RESEARCH.md) — the whole account, including what failed
+- [MIRROR.md](docs/MIRROR.md): the primitive everything sits on
+- [SCIENCE.md](docs/SCIENCE.md): falsification, and what makes a claim risky
+- [CREDULITY.md](docs/CREDULITY.md): where acting on a correlation is dangerous
+- [ONTOLOGY.md](docs/ONTOLOGY.md): concepts a machine coins for itself
+- [RESEARCH.md](RESEARCH.md): the whole account, including what failed
 
 ## Building it
 
@@ -247,7 +249,7 @@ CoreScout is local-first. Everything it records stays in
   it; CoreScout then starts again from nothing.
 - **Contact.** https://github.com/mattbusel/corescout/issues
 
-Full policy: <https://corescout.vercel.app/privacy>
+Full policy: [docs/PRIVACY.md](docs/PRIVACY.md)
 
 ## Licence
 
