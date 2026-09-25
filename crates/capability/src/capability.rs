@@ -245,7 +245,7 @@ impl Capability {
     /// The ways this procedure is known to fail, commonest first.
     pub fn failure_modes(&self) -> Vec<(&Failure, u32)> {
         let mut modes: Vec<(&Failure, u32)> = self.failures.iter().map(|(f, n)| (f, *n)).collect();
-        modes.sort_by(|a, b| b.1.cmp(&a.1));
+        modes.sort_by_key(|m| std::cmp::Reverse(m.1));
         modes
     }
 

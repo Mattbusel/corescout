@@ -41,14 +41,48 @@ Everything stays on your computer. No account, no server, no telemetry.
 
 ## Install
 
-Windows 10 and 11, 64-bit. No installer has been published to GitHub Releases
-yet, so for now build it from source: `pwsh scripts/release.ps1` writes
-`CoreScoutSetup.exe` into `dist/` (details in [WINDOWS.md](docs/WINDOWS.md)).
-Run it and open CoreScout.
+### Download
 
-The installer is not signed, so SmartScreen will object; **More info** →
-**Run anyway**, or check the published SHA-256 first. It needs no
-administrator, and no Rust, Node, Python, WSL or Docker.
+Get the latest build from
+[GitHub Releases](https://github.com/Mattbusel/corescout/releases/latest).
+Pick the file for your computer:
+
+| You have | Download |
+| --- | --- |
+| Windows 10 or 11 (the full app) | `CoreScoutSetup.exe` (or `CoreScout.msi`) |
+| Windows, command line only | `corescout-vX.Y.Z-x86_64-pc-windows-msvc.zip` |
+| Mac with Apple Silicon (M1 and later) | `corescout-vX.Y.Z-aarch64-apple-darwin.tar.gz` |
+| Mac with an Intel chip | `corescout-vX.Y.Z-x86_64-apple-darwin.tar.gz` |
+| Linux, 64-bit | `corescout-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz` |
+
+The Windows installer gives you the desktop app, the background service and
+the MCP bridge. It needs no administrator, and no Rust, Node, Python, WSL or
+Docker. The archives hold just the three programs: `corescout` (the command
+line), `corescout-service` and `corescout-mcp`. The desktop app is Windows
+only for now.
+
+The downloads are not signed, so your computer will be cautious the first
+time. On Windows, SmartScreen may say "unknown publisher": click **More info**,
+then **Run anyway**. On a Mac, right-click the program and choose **Open**.
+Every file's SHA-256 is in `SHA256SUMS.txt` on the release page if you want to
+check it.
+
+### With Cargo
+
+If you have Rust installed:
+
+```bash
+cargo install corescout-cli       # the `corescout` command
+cargo install corescout-service
+cargo install corescout-mcp
+```
+
+### From source
+
+`pwsh scripts/release.ps1` builds `CoreScoutSetup.exe` into `dist/` (details in
+[WINDOWS.md](docs/WINDOWS.md)); `cargo build --release -p corescout-cli -p
+corescout-service -p corescout-mcp` builds just the programs. See
+[Building it](#building-it).
 
 ## Connect your AI
 

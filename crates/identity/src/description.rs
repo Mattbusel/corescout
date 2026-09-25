@@ -191,7 +191,7 @@ impl SelfDescription {
     /// Sorted with the best-evidenced claims first.
     pub fn by_evidence(&self) -> Vec<&Proposition> {
         let mut sorted: Vec<&Proposition> = self.propositions.iter().collect();
-        sorted.sort_by(|a, b| b.ground.weight().cmp(&a.ground.weight()));
+        sorted.sort_by_key(|p| std::cmp::Reverse(p.ground.weight()));
         sorted
     }
 

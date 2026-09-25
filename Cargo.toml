@@ -45,7 +45,7 @@ members = [
 exclude = ["apps/corescout-desktop/src-tauri"]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT OR Apache-2.0"
@@ -67,34 +67,34 @@ windows-sys = { version = "0.52", features = [
     "Win32_System_Kernel",
     "Win32_Security",
 ] }
-corescout-core = { path = "crates/core" }
-corescout-mirror = { path = "crates/mirror" }
-corescout-substrate = { path = "crates/substrate" }
-corescout-memory = { path = "crates/memory" }
-corescout-represent = { path = "crates/represent" }
-corescout-science = { path = "crates/science" }
-corescout-concept = { path = "crates/concept" }
-corescout-capability = { path = "crates/capability" }
-corescout-lineage = { path = "crates/lineage" }
-corescout-selfmodel = { path = "crates/selfmodel" }
-corescout-identity = { path = "crates/identity" }
-corescout-intent = { path = "crates/intent" }
-corescout-counterfactual = { path = "crates/counterfactual" }
-corescout-observer = { path = "crates/observer" }
-corescout-agency = { path = "crates/agency" }
-corescout-experiment = { path = "crates/experiment" }
-corescout-analysis = { path = "crates/analysis" }
-corescout-autonomy = { path = "crates/autonomy" }
-corescout-human = { path = "crates/human" }
-corescout-report = { path = "crates/report" }
-corescout-storage = { path = "crates/storage" }
-corescout-store-commerce = { path = "crates/store-commerce" }
-corescout-permissions = { path = "crates/permissions" }
-corescout-agent-observation = { path = "crates/agent-observation" }
-corescout-agent-experience = { path = "crates/agent-experience" }
-corescout-capability-runtime = { path = "crates/capability-runtime" }
-corescout-product-api = { path = "crates/product-api" }
-corescout-mcp-server = { path = "crates/mcp-server" }
+corescout-core = { version = "1.1.0", path = "crates/core" }
+corescout-mirror = { version = "1.1.0", path = "crates/mirror" }
+corescout-substrate = { version = "1.1.0", path = "crates/substrate" }
+corescout-memory = { version = "1.1.0", path = "crates/memory" }
+corescout-represent = { version = "1.1.0", path = "crates/represent" }
+corescout-science = { version = "1.1.0", path = "crates/science" }
+corescout-concept = { version = "1.1.0", path = "crates/concept" }
+corescout-capability = { version = "1.1.0", path = "crates/capability" }
+corescout-lineage = { version = "1.1.0", path = "crates/lineage" }
+corescout-selfmodel = { version = "1.1.0", path = "crates/selfmodel" }
+corescout-identity = { version = "1.1.0", path = "crates/identity" }
+corescout-intent = { version = "1.1.0", path = "crates/intent" }
+corescout-counterfactual = { version = "1.1.0", path = "crates/counterfactual" }
+corescout-observer = { version = "1.1.0", path = "crates/observer" }
+corescout-agency = { version = "1.1.0", path = "crates/agency" }
+corescout-experiment = { version = "1.1.0", path = "crates/experiment" }
+corescout-analysis = { version = "1.1.0", path = "crates/analysis" }
+corescout-autonomy = { version = "1.1.0", path = "crates/autonomy" }
+corescout-human = { version = "1.1.0", path = "crates/human" }
+corescout-report = { version = "1.1.0", path = "crates/report" }
+corescout-storage = { version = "1.1.0", path = "crates/storage" }
+corescout-store-commerce = { version = "1.1.0", path = "crates/store-commerce" }
+corescout-permissions = { version = "1.1.0", path = "crates/permissions" }
+corescout-agent-observation = { version = "1.1.0", path = "crates/agent-observation" }
+corescout-agent-experience = { version = "1.1.0", path = "crates/agent-experience" }
+corescout-capability-runtime = { version = "1.1.0", path = "crates/capability-runtime" }
+corescout-product-api = { version = "1.1.0", path = "crates/product-api" }
+corescout-mcp-server = { version = "1.1.0", path = "crates/mcp-server" }
 
 [profile.release]
 # The benchmark workloads in `experiment` are part of the measurement
