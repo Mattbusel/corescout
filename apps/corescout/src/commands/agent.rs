@@ -280,8 +280,14 @@ fn install_interrupt_handler(flag: Arc<AtomicBool>) {
     // SAFETY: the handler only stores to a static atomic, which is permitted
     // from a signal context.
     unsafe {
-        libc::signal(libc::SIGINT, handle as libc::sighandler_t);
-        libc::signal(libc::SIGTERM, handle as libc::sighandler_t);
+        libc::signal(
+            libc::SIGINT,
+            handle as extern "C" fn(libc::c_int) as libc::sighandler_t,
+        );
+        libc::signal(
+            libc::SIGTERM,
+            handle as extern "C" fn(libc::c_int) as libc::sighandler_t,
+        );
     }
 
     // A watcher thread carries the signal across to the loop's own flag. The

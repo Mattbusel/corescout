@@ -1,7 +1,11 @@
 name: release
 
-# Builds the installers and attaches them to a tag, with the filenames the
-# download page links to.
+# Push a tag like v1.1.0 and this builds:
+#   - the Windows installers (CoreScoutSetup.exe, CoreScout.msi), the names the
+#     download page links to;
+#   - the command line, the service and the MCP bridge as plain archives for
+#     Windows, macOS (Apple Silicon and Intel) and Linux;
+# then attaches all of it, with SHA256SUMS.txt, to a GitHub Release.
 #
 # Nothing here signs anything. Signing needs a certificate this repository does
 # not contain and should not; docs/WINDOWS.md says what to do when you have one.
@@ -9,15 +13,106 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Build-only dry run when this workflow changes (nothing is released).
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/release.ps1"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build, e.g. v1.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  TAG: ${{ github.event_name == 'pull_request' && 'pr-test' || github.event.inputs.tag || github.ref_name }}
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    permissions:
-      contents: write
+  binaries:
+    name: binaries ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    env:
+      # Debug info is useful on a developer's machine and dead weight in a
+      # download.
+      CARGO_PROFILE_RELEASE_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || env.TAG }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: build
+        run: cargo build --release --locked --target ${{ matrix.target }} -p corescout-cli -p corescout-service -p corescout-mcp
+
+      - name: package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          name="corescout-${TAG}-${{ matrix.target }}"
+          mkdir "$name"
+          for bin in corescout corescout-service corescout-mcp; do
+            cp "target/${{ matrix.target }}/release/$bin" "$name/"
+          done
+          cp README.md LICENSE-MIT LICENSE-APACHE "$name/"
+          tar czf "$name.tar.gz" "$name"
+
+      - name: package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "corescout-$env:TAG-${{ matrix.target }}"
+          New-Item -ItemType Directory $name | Out-Null
+          foreach ($bin in "corescout", "corescout-service", "corescout-mcp") {
+            Copy-Item "target/${{ matrix.target }}/release/$bin.exe" $name
+          }
+          Copy-Item README.md, LICENSE-MIT, LICENSE-APACHE $name
+          Compress-Archive -Path $name -DestinationPath "$name.zip"
+
+      - name: smoke test
+        if: matrix.target != 'x86_64-apple-darwin'
+        shell: bash
+        run: |
+          "target/${{ matrix.target }}/release/corescout" --help | head -3
+          "target/${{ matrix.target }}/release/corescout-service" --help | head -1
+          "target/${{ matrix.target }}/release/corescout-mcp" --help | head -1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.target }}
+          path: |
+            corescout-*.tar.gz
+            corescout-*.zip
+
+  installers:
+    name: windows installers
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.sha || env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
@@ -31,13 +126,60 @@ jobs:
       - name: check what is about to ship
         run: cargo test -p corescout-integration --test installed -- --ignored
 
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      - uses: actions/upload-artifact@v4
         with:
-          files: dist/*
-          fail_on_unmatched_files: true
-          body: |
-            Windows 10 and 11, 64-bit. Free, open source, local-first.
+          name: installers
+          path: |
+            dist/*.exe
+            dist/*.msi
 
-            These installers are not signed, so SmartScreen will warn. Check the
-            SHA-256 beside each file, or build it yourself from source.
+  release:
+    name: publish the release
+    needs: [binaries, installers]
+    # Ship whatever built; a platform that failed is listed in the job summary
+    # rather than holding back the others.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: checksums
+        run: |
+          cd dist
+          ls -l
+          test -n "$(ls)" || { echo "nothing built"; exit 1; }
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cat > notes.md <<EOF
+          CoreScout ${TAG}. Free, open source, local-first.
+
+          **Windows, the full app:** \`CoreScoutSetup.exe\` (or \`CoreScout.msi\`). Installs the desktop app, the background service and the MCP bridge.
+
+          **Command line only** (the \`corescout\` CLI, \`corescout-service\` and \`corescout-mcp\`):
+          - Windows: \`corescout-${TAG}-x86_64-pc-windows-msvc.zip\`
+          - macOS Apple Silicon: \`corescout-${TAG}-aarch64-apple-darwin.tar.gz\`
+          - macOS Intel: \`corescout-${TAG}-x86_64-apple-darwin.tar.gz\`
+          - Linux x86_64: \`corescout-${TAG}-x86_64-unknown-linux-gnu.tar.gz\`
+
+          Nothing here is signed. Windows SmartScreen may say "unknown publisher": click More info, then Run anyway. On macOS, right-click the binary and choose Open the first time. Check any file against \`SHA256SUMS.txt\`.
+
+          See CHANGELOG.md for what changed.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "CoreScout $TAG" --notes-file notes.md
+          fi

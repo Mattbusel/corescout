@@ -475,6 +475,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows paths; backslash is not a separator elsewhere
     fn a_path_that_climbs_out_is_refused() {
         let escaping = Capability {
             steps: vec![Operation::Run {
@@ -490,6 +491,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows paths; backslash is not a separator elsewhere
     fn an_argument_that_climbs_out_is_refused() {
         let escaping = Capability {
             steps: vec![Operation::run("cargo", &["build", "..\\..\\secrets"])],

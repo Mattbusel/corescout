@@ -185,6 +185,7 @@ pub fn thread_cycles() -> Option<u64> {
 /// Read directly rather than from the registry: the registry copy is written at
 /// install time and can be stale on a machine whose CPU was replaced, and this
 /// is one of the few facts worth getting from the silicon itself.
+#[allow(unused_unsafe)] // the intrinsic is safe on newer toolchains only
 pub fn cpu_brand() -> Option<String> {
     #[cfg(target_arch = "x86_64")]
     {
@@ -213,6 +214,7 @@ pub fn cpu_brand() -> Option<String> {
 }
 
 /// The vendor string, from `CPUID` leaf 0.
+#[allow(unused_unsafe)] // the intrinsic is safe on newer toolchains only
 pub fn cpu_vendor() -> Option<String> {
     #[cfg(target_arch = "x86_64")]
     {

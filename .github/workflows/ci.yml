@@ -40,7 +40,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: tests
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
 
       - name: documentation
         run: cargo doc --workspace --no-deps

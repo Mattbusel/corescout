@@ -27,7 +27,9 @@ pub struct Regs {
 }
 
 /// Execute `CPUID` with the given leaf, or `None` off x86.
-#[allow(unused_variables)]
+// `unused_unsafe`: newer toolchains made these intrinsics safe; the block
+// is still required on the minimum supported Rust version.
+#[allow(unused_variables, unused_unsafe)]
 pub fn cpuid(leaf: u32) -> Option<Regs> {
     #[cfg(target_arch = "x86_64")]
     {
@@ -55,7 +57,7 @@ pub fn cpuid(leaf: u32) -> Option<Regs> {
 }
 
 /// Execute `CPUID` with an explicit sub-leaf in ECX.
-#[allow(unused_variables)]
+#[allow(unused_variables, unused_unsafe)]
 pub fn cpuid_count(leaf: u32, sub_leaf: u32) -> Option<Regs> {
     #[cfg(target_arch = "x86_64")]
     {

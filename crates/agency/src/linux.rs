@@ -217,6 +217,11 @@ pub fn get_numa_preference() -> Result<Option<u32>> {
 /// Used by the scope layer before it will accept a pid: a controller must not
 /// be able to register a process it has no business touching.
 pub fn process_is_reachable(pid: i32) -> bool {
+    // kill(2) treats 0 and negative pids as process groups, and -1 as every
+    // process this user may signal; none of those is one process.
+    if pid <= 0 {
+        return false;
+    }
     // SAFETY: signal 0 performs the permission check without delivering
     // anything, which is exactly what is wanted.
     unsafe { libc::kill(pid, 0) == 0 }

@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-agent-experience"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-agent-observation",
  "corescout-science",
@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-agent-observation"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -407,7 +407,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-capability-runtime"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-agent-observation",
  "corescout-permissions",
@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "libc",
  "serde",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-desktop"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-product-api",
  "corescout-storage",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-identity"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "corescout-memory",
@@ -450,7 +450,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-memory"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "corescout-mirror",
@@ -460,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-mirror"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "libc",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-permissions"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-product-api"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-agent-experience",
  "corescout-agent-observation",
@@ -500,7 +500,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-represent"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "corescout-memory",
@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-science"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "corescout-memory",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-selfmodel"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "corescout-memory",
@@ -535,7 +535,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-storage"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "redb",
@@ -545,7 +545,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-store-commerce"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-storage",
  "serde",
@@ -554,7 +554,7 @@ dependencies = [
 
 [[package]]
 name = "corescout-substrate"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "corescout-core",
  "corescout-mirror",

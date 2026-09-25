@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "corescout",
   "display_name": "CoreScout",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Operational memory for the machine your AI works on: what fails here, what has been verified, and what state the computer is in.",
   "long_description": "CoreScout observes this computer and what AI tools do to it, notices what recurs, and tests the promising patterns under randomised assignment before it claims a cause. Claude can ask it what has failed here before, whether a verified procedure exists for an operation, and whether the machine is in an unusual state, and can report outcomes back so the next session starts from what this one learned.\n\nEverything stays on the machine. There is no account, no server and no telemetry: the extension bundles the CoreScout service and talks to it over a loopback socket guarded by a token only your account can read.",
   "author": {

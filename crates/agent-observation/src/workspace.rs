@@ -148,6 +148,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // backslash is only a separator on Windows
     fn the_identifier_is_readable_and_usable_as_a_storage_key() {
         let workspace = Workspace::new("C:\\Projects\\my-app", 1);
         assert!(workspace.id.starts_with("my-app-"), "{}", workspace.id);
@@ -158,6 +159,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // backslash is only a separator on Windows
     fn paths_are_stored_relative_to_the_workspace() {
         // So what was learned still applies after the repository is cloned
         // somewhere else, and an export carries no home directory layout.
@@ -181,6 +183,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // backslash is only a separator on Windows
     fn the_name_is_the_folder_name() {
         assert_eq!(Workspace::new("C:\\Projects\\my-app", 1).name, "my-app");
     }
