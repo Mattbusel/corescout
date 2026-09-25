@@ -674,6 +674,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows paths; backslash is not a separator elsewhere
     fn the_working_directory_is_the_workspace_root_plus_any_relative_part() {
         assert_eq!(
             working_directory(

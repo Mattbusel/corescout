@@ -375,6 +375,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows paths; backslash is not a separator elsewhere
     fn a_granted_folder_permits_what_is_inside_it() {
         let mut authority = Authority::own_process_only();
         assert!(authority.grant_root("C:\\Projects\\app"));
@@ -475,6 +476,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows paths; backslash is not a separator elsewhere
     fn a_set_of_targets_is_permitted_only_if_all_of_them_are() {
         let mut authority = Authority::own_process_only();
         authority.grant_root("C:\\Projects\\app");
@@ -492,6 +494,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(windows)] // Windows paths; backslash is not a separator elsewhere
     fn revoking_takes_the_reach_away_again() {
         let mut authority = Authority::own_process_only();
         authority.grant_root("C:\\Projects\\app");

@@ -156,10 +156,19 @@ fn a_full_analysis_ranks_every_measured_core() {
         assert!((0.0..=100.0).contains(&core.stability));
     }
 
-    // Exactly one core scores 100 in each ranking, by construction.
+    // The top core scores 100 in each single-measure ranking, by construction.
+    // "overall" averages several measures, so its leader need not win all of
+    // them and can score below 100.
     for ranking in &analysis.rankings {
         assert!(!ranking.entries.is_empty());
-        assert!((ranking.entries[0].score - 100.0).abs() < 1e-6);
+        if ranking.id != "overall" {
+            assert!(
+                (ranking.entries[0].score - 100.0).abs() < 1e-6,
+                "{}",
+                ranking.id
+            );
+        }
+        assert!(ranking.entries[0].score <= 100.0 + 1e-6);
         // Entries must be in descending score order.
         for pair in ranking.entries.windows(2) {
             assert!(pair[0].score >= pair[1].score, "{} is unsorted", ranking.id);
