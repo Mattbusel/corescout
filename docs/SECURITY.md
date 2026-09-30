@@ -144,7 +144,7 @@ the actions CoreScout took lies by omission.
 
 ## Reporting something
 
-Open an issue at <https://github.com/mattbusel/corescout/issues>. If it is
+Open an issue at <https://gitlab.com/mattbusel/corescout/-/issues>. If it is
 sensitive, say so in the issue without the details and a contact will be
 arranged. This is a small project and there is no bounty; there is a real
 interest in getting this right.

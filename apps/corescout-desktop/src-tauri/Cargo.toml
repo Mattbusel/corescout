@@ -5,7 +5,7 @@ version = "1.1.0"
 edition = "2021"
 rust-version = "1.77"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/mattbusel/corescout"
+repository = "https://gitlab.com/mattbusel/corescout"
 
 # Deliberately not a member of the workspace. Tauri's dependency tree is an
 # order of magnitude larger than everything else here, and keeping it out means

@@ -44,7 +44,7 @@ Everything stays on your computer. No account, no server, no telemetry.
 ### Download
 
 Get the latest build from
-[GitHub Releases](https://github.com/Mattbusel/corescout/releases/latest).
+[GitHub Releases](https://gitlab.com/mattbusel/corescout/-/releases).
 Pick the file for your computer:
 
 | You have | Download |
@@ -281,7 +281,7 @@ CoreScout is local-first. Everything it records stays in
 - **Retention.** Kept until you delete it. The application deletes any category
   of it on request, and removing `%LOCALAPPDATA%\CoreScout\` removes all of
   it; CoreScout then starts again from nothing.
-- **Contact.** https://github.com/mattbusel/corescout/issues
+- **Contact.** https://gitlab.com/mattbusel/corescout/-/issues
 
 Full policy: [docs/PRIVACY.md](docs/PRIVACY.md)
 

@@ -7,14 +7,14 @@
   "long_description": "CoreScout observes this computer and what AI tools do to it, notices what recurs, and tests the promising patterns under randomised assignment before it claims a cause. Claude can ask it what has failed here before, whether a verified procedure exists for an operation, and whether the machine is in an unusual state, and can report outcomes back so the next session starts from what this one learned.\n\nEverything stays on the machine. There is no account, no server and no telemetry: the extension bundles the CoreScout service and talks to it over a loopback socket guarded by a token only your account can read.",
   "author": {
     "name": "Tensorust",
-    "url": "https://github.com/mattbusel/corescout"
+    "url": "https://gitlab.com/mattbusel/corescout"
   },
   "homepage": "https://corescout.vercel.app",
-  "documentation": "https://github.com/mattbusel/corescout/blob/master/docs/MCP.md",
-  "support": "https://github.com/mattbusel/corescout/issues",
+  "documentation": "https://gitlab.com/mattbusel/corescout/-/blob/master/docs/MCP.md",
+  "support": "https://gitlab.com/mattbusel/corescout/-/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mattbusel/corescout"
+    "url": "https://gitlab.com/mattbusel/corescout"
   },
   "icon": "icon.png",
   "license": "MIT OR Apache-2.0",
