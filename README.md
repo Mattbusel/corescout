@@ -1,14 +1,59 @@
 # CoreScout
 
-**Your AI gets smarter. Now its computer can too.**
+**Your AI forgets everything between sessions. CoreScout lets the computer remember what went wrong, test what actually fixes it, and tell the next AI.**
 
-CoreScout watches how your machine and your AI work together, remembers what
-reality teaches them, and turns useful discoveries into better ways of working.
+[![crates.io](https://img.shields.io/crates/v/corescout-cli.svg?label=crates.io)](https://crates.io/crates/corescout-cli)
+[![Release](https://img.shields.io/github/v/release/Mattbusel/corescout)](https://github.com/Mattbusel/corescout/releases/latest)
+[![License: MIT or Apache-2.0](https://img.shields.io/badge/license-MIT%20%7C%20Apache--2.0-blue.svg)](#licence)
 
-Free. Open source. Local-first. Rust, with a Tauri desktop app and an MCP server for your AI client.
-[Browser preview of the interface](https://corescout-desktop.vercel.app) (no real data; the real thing runs on your machine).
+<p align="center">
+  <img src="docs/media/loop.svg" alt="Your AI and your machine feed CoreScout. It sees, learns, verifies with coin-flip trials, and hands improvements back." width="900">
+</p>
 
----
+Free, open source, and local-first: no account, no server, no telemetry. Written in Rust, with a desktop app and an [MCP](docs/MCP.md) server so Claude Code, Claude Desktop, Cursor or any MCP client can ask it questions.
+
+## Install
+
+| You have | Get |
+| --- | --- |
+| Windows 10 or 11 | [`CoreScoutSetup.exe`](https://github.com/Mattbusel/corescout/releases/latest) (desktop app + background service + MCP bridge) |
+| Mac (Apple Silicon or Intel) or Linux | the `.tar.gz` for your machine from [Releases](https://github.com/Mattbusel/corescout/releases/latest) |
+| Rust | `cargo install corescout-cli corescout-service corescout-mcp` |
+
+No admin rights, and no Node, Python, WSL or Docker. The downloads are not signed yet, so Windows may say "unknown publisher" (**More info**, then **Run anyway**) and a Mac wants right-click, **Open**. Every file's SHA-256 is in `SHA256SUMS.txt` on the release page.
+
+## Three steps
+
+1. **Install it** (above). It starts watching the machine straight away.
+2. **Connect your AI.** For Claude Code that is one line:
+   ```bash
+   claude mcp add corescout --scope user -- "C:\Program Files\CoreScout\corescout-mcp.exe"
+   ```
+   The app's **AI** screen writes the config for other clients, and can add a hook so every tool call is recorded without the AI having to remember.
+3. **Work as usual.** Before something risky, your AI can ask "what goes wrong here?" and get an answer that comes with its evidence.
+
+## A real answer from a real machine
+
+<p align="center">
+  <img src="docs/media/real-answer.svg" alt="CoreScout's real answer on the author's machine: a rebuild chain that failed 5 of 5 times and was never checked afterwards, and a ping that failed 6 of 6." width="900">
+</p>
+
+Those numbers are what CoreScout returned on the author's PC on 2026-10-04, after a few weeks of real use. It caught a rebuild script that failed every time and was never checked afterwards. It has **not** yet promoted anything to Verified there, because a claim only gets that label after enough coin-flip trials. It would rather tell you that than invent a win.
+
+## Seen together vs. Verified
+
+<p align="center">
+  <img src="docs/media/seen-vs-verified.svg" alt="Illustration: on the left, two things keep happening together and are labelled Seen together. On the right, a coin flip decides whether to try the fix, and only the measured result is labelled Verified." width="900">
+</p>
+
+Most tools that "learn" just notice that two things happened together and act on it. That is how you end up with superstitions. CoreScout keeps the two apart, and the labels never blur:
+
+| label | means |
+|---|---|
+| **Seen together** | Two things kept happening together. CoreScout has not tested whether one causes the other. |
+| **Verified** | CoreScout let a coin flip decide whether to try the change, then measured the difference. |
+
+It also never prints `0%` for something it has never measured. A capability that has never run reads *never used*, because zero out of zero is not zero per cent.
 
 ## The problem
 
@@ -39,76 +84,6 @@ computer, and computers do not learn from their own experience.
 
 Everything stays on your computer. No account, no server, no telemetry.
 
-## Install
-
-### Download
-
-Get the latest build from
-[GitHub Releases](https://gitlab.com/mattbusel/corescout/-/releases).
-Pick the file for your computer:
-
-| You have | Download |
-| --- | --- |
-| Windows 10 or 11 (the full app) | `CoreScoutSetup.exe` (or `CoreScout.msi`) |
-| Windows, command line only | `corescout-vX.Y.Z-x86_64-pc-windows-msvc.zip` |
-| Mac with Apple Silicon (M1 and later) | `corescout-vX.Y.Z-aarch64-apple-darwin.tar.gz` |
-| Mac with an Intel chip | `corescout-vX.Y.Z-x86_64-apple-darwin.tar.gz` |
-| Linux, 64-bit | `corescout-vX.Y.Z-x86_64-unknown-linux-gnu.tar.gz` |
-
-The Windows installer gives you the desktop app, the background service and
-the MCP bridge. It needs no administrator, and no Rust, Node, Python, WSL or
-Docker. The archives hold just the three programs: `corescout` (the command
-line), `corescout-service` and `corescout-mcp`. The desktop app is Windows
-only for now.
-
-The downloads are not signed, so your computer will be cautious the first
-time. On Windows, SmartScreen may say "unknown publisher": click **More info**,
-then **Run anyway**. On a Mac, right-click the program and choose **Open**.
-Every file's SHA-256 is in `SHA256SUMS.txt` on the release page if you want to
-check it.
-
-### With Cargo
-
-If you have Rust installed:
-
-```bash
-cargo install corescout-cli       # the `corescout` command
-cargo install corescout-service
-cargo install corescout-mcp
-```
-
-### From source
-
-`pwsh scripts/release.ps1` builds `CoreScoutSetup.exe` into `dist/` (details in
-[WINDOWS.md](docs/WINDOWS.md)); `cargo build --release -p corescout-cli -p
-corescout-service -p corescout-mcp` builds just the programs. See
-[Building it](#building-it).
-
-## Connect your AI
-
-CoreScout speaks the [Model Context Protocol](docs/MCP.md), so anything that
-does will work. The AI screen in the application generates the exact
-configuration for your client and will usually write it for you.
-
-For Claude Code, that is one line:
-
-```bash
-claude mcp add corescout --scope user -- "C:\Program Files\CoreScout\corescout-mcp.exe"
-```
-
-The AI screen also offers a second piece: a hook that fires on every tool call,
-so what CoreScout learns does not depend on your AI remembering to mention
-anything. It writes that for you too, keeping any hooks you already had.
-
-Then use your AI exactly as you normally would. CoreScout does not interrupt.
-
-For a command you want measured exactly, there is a wrapper:
-
-```bash
-corescout run -- cargo build          # exit code and timing, verified
-corescout run --placement fast -- cargo test
-```
-
 ## What you will see
 
 After a while, the Home screen says something like:
@@ -131,17 +106,6 @@ Open any of it and you get the evidence: what was observed, how many times,
 whether it was tested or merely noticed, what the alternative was, and what
 happened. That is the whole point. A tool that tells you what to do without
 telling you how it knows is asking for trust it has not earned.
-
-The distinction the interface never blurs:
-
-| label | means |
-|---|---|
-| **Seen together** | Two things kept happening together. CoreScout has not tested whether one causes the other. |
-| **Verified** | CoreScout deliberately varied one of them and measured what happened. |
-
-And what it will not print: `0%` for something never measured. A capability
-that has never run reads *never used*, because zero out of zero is not zero
-per cent.
 
 ## How much it may do
 
@@ -212,7 +176,7 @@ your machine again
 - [ARCHITECTURE_PRODUCT.md](docs/ARCHITECTURE_PRODUCT.md): the product layers and the rules they follow
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): the research crate graph and what each layer may not do
 
-## A real machine
+## The first run on real hardware
 
 The first time this ran on hardware (a 13th Gen Intel Core i7-13700KF, 16
 physical cores, 24 logical), it made over 900 reflections in 36 seconds:
@@ -252,6 +216,10 @@ evidence ages out. All of that is still here and still runs, under
 
 ## Building it
 
+`pwsh scripts/release.ps1` builds `CoreScoutSetup.exe` into `dist/` (details in
+[WINDOWS.md](docs/WINDOWS.md)); `cargo build --release -p corescout-cli -p
+corescout-service -p corescout-mcp` builds just the programs.
+
 ```bash
 cargo test --workspace       # ~1,300 tests
 cargo clippy --workspace --all-targets
@@ -281,7 +249,7 @@ CoreScout is local-first. Everything it records stays in
 - **Retention.** Kept until you delete it. The application deletes any category
   of it on request, and removing `%LOCALAPPDATA%\CoreScout\` removes all of
   it; CoreScout then starts again from nothing.
-- **Contact.** https://gitlab.com/mattbusel/corescout/-/issues
+- **Contact.** https://github.com/Mattbusel/corescout/issues
 
 Full policy: [docs/PRIVACY.md](docs/PRIVACY.md)
 

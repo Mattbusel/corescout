@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" role="img" aria-label="CoreScout loop: your AI and your machine feed it events; it sees, learns, verifies with coin-flip trials, and hands improvements back to your AI.">
+  <style>
+    .bg { fill: #0e1513; }
+    .sans { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; }
+    .title { fill: #e8f1ee; font-size: 15px; font-weight: 600; }
+    .cap { fill: #7f948e; font-size: 11.5px; }
+    .src { fill: #15211e; stroke: #2a3b36; stroke-width: 1.2; }
+    .srct { fill: #b9cbc5; font-size: 12.5px; font-weight: 600; }
+    .stage { fill: #15211e; stroke: #2a3b36; stroke-width: 1.4; }
+    .wire { stroke: #2a3b36; stroke-width: 2; fill: none; }
+    .ret { stroke: #2a3b36; stroke-width: 2; fill: none; stroke-dasharray: 4 6; }
+    .dot { fill: #4fd1a5; }
+    .dotb { fill: #7aa7ff; }
+
+    @keyframes glow1 { 0%,4% { stroke: #2a3b36; fill: #15211e } 8%,28% { stroke: #4fd1a5; fill: #17332a } 34%,100% { stroke: #2a3b36; fill: #15211e } }
+    @keyframes glow2 { 0%,26% { stroke: #2a3b36; fill: #15211e } 30%,50% { stroke: #4fd1a5; fill: #17332a } 56%,100% { stroke: #2a3b36; fill: #15211e } }
+    @keyframes glow3 { 0%,48% { stroke: #2a3b36; fill: #15211e } 52%,72% { stroke: #f2c14e; fill: #352d17 } 78%,100% { stroke: #2a3b36; fill: #15211e } }
+    @keyframes glow4 { 0%,70% { stroke: #2a3b36; fill: #15211e } 74%,94% { stroke: #4fd1a5; fill: #17332a } 99%,100% { stroke: #2a3b36; fill: #15211e } }
+    @keyframes cap1 { 0%,4% { fill: #7f948e } 8%,28% { fill: #d6e6e0 } 34%,100% { fill: #7f948e } }
+    @keyframes cap2 { 0%,26% { fill: #7f948e } 30%,50% { fill: #d6e6e0 } 56%,100% { fill: #7f948e } }
+    @keyframes cap3 { 0%,48% { fill: #7f948e } 52%,72% { fill: #f5dfa5 } 78%,100% { fill: #7f948e } }
+    @keyframes cap4 { 0%,70% { fill: #7f948e } 74%,94% { fill: #d6e6e0 } 99%,100% { fill: #7f948e } }
+    .s1 { animation: glow1 9s infinite; } .c1 { animation: cap1 9s infinite; }
+    .s2 { animation: glow2 9s infinite; } .c2 { animation: cap2 9s infinite; }
+    .s3 { animation: glow3 9s infinite; } .c3 { animation: cap3 9s infinite; }
+    .s4 { animation: glow4 9s infinite; } .c4 { animation: cap4 9s infinite; }
+
+    /* events flowing in from the AI and from the machine */
+    @keyframes inA { 0% { transform: translate(0,0); opacity: 0 } 3% { opacity: 1 } 22% { transform: translate(98px,38px); opacity: 1 } 25%,100% { transform: translate(98px,38px); opacity: 0 } }
+    @keyframes inB { 0% { transform: translate(0,0); opacity: 0 } 3% { opacity: 1 } 22% { transform: translate(98px,-38px); opacity: 1 } 25%,100% { transform: translate(98px,-38px); opacity: 0 } }
+    .ea { animation: inA 9s infinite; }
+    .eb { animation: inB 9s infinite; }
+    .d1 { animation-delay: 0s } .d2 { animation-delay: .5s } .d3 { animation-delay: 1s } .d4 { animation-delay: 1.5s }
+
+    /* pulse moving along the stage wire */
+    @keyframes pulse { 0%,26% { transform: translateX(0); opacity: 0 } 28% { opacity: 1 } 50% { transform: translateX(150px) } 72% { transform: translateX(300px) } 76% { transform: translateX(300px); opacity: 1 } 78%,100% { transform: translateX(300px); opacity: 0 } }
+    .pulse { animation: pulse 9s infinite; }
+
+    /* the coin flip inside Verifies */
+    @keyframes flip { 0%,50% { transform: scaleX(1) } 54% { transform: scaleX(-1) } 58% { transform: scaleX(1) } 62% { transform: scaleX(-1) } 66%,100% { transform: scaleX(1) } }
+    .coin { animation: flip 9s infinite; transform-box: fill-box; transform-origin: center; }
+
+    /* the verified lesson travelling back to your AI */
+    @keyframes back { 0%,76% { transform: translateX(0); opacity: 0 } 79% { opacity: 1 } 97% { transform: translateX(-560px); opacity: 1 } 100% { transform: translateX(-560px); opacity: 0 } }
+    .card { animation: back 9s infinite; }
+  </style>
+
+  <rect class="bg" x="0" y="0" width="900" height="300" rx="14"/>
+
+  <!-- sources -->
+  <rect class="src" x="24" y="58" width="132" height="54" rx="10"/>
+  <text class="sans srct" x="90" y="82" text-anchor="middle">your AI</text>
+  <text class="sans cap" x="90" y="100" text-anchor="middle">tool calls, commands</text>
+  <rect class="src" x="24" y="134" width="132" height="54" rx="10"/>
+  <text class="sans srct" x="90" y="158" text-anchor="middle">your machine</text>
+  <text class="sans cap" x="90" y="176" text-anchor="middle">cores, load, memory</text>
+
+  <path class="wire" d="M156 85 C 200 85, 200 123, 252 123"/>
+  <path class="wire" d="M156 161 C 200 161, 200 123, 252 123"/>
+
+  <!-- events -->
+  <g transform="translate(156,85)">
+    <circle class="dot ea d1" r="4"/><circle class="dot ea d2" r="4"/><circle class="dot ea d3" r="4"/><circle class="dot ea d4" r="4"/>
+  </g>
+  <g transform="translate(156,161)">
+    <circle class="dotb eb d1" r="4"/><circle class="dotb eb d2" r="4"/><circle class="dotb eb d3" r="4"/><circle class="dotb eb d4" r="4"/>
+  </g>
+
+  <!-- stage wire and pulse -->
+  <path class="wire" d="M372 123 H 402 M522 123 H 552 M672 123 H 702"/>
+  <circle class="dot pulse" cx="312" cy="123" r="5"/>
+
+  <!-- stages -->
+  <rect class="stage s1" x="252" y="96" width="120" height="54" rx="12"/>
+  <text class="sans title" x="312" y="129" text-anchor="middle">1  Sees</text>
+  <rect class="stage s2" x="402" y="96" width="120" height="54" rx="12"/>
+  <text class="sans title" x="462" y="129" text-anchor="middle">2  Learns</text>
+  <rect class="stage s3" x="552" y="96" width="120" height="54" rx="12"/>
+  <text class="sans title" x="602" y="129" text-anchor="middle">3  Verifies</text>
+  <g transform="translate(652,123)">
+    <circle class="coin" cx="0" cy="0" r="8" fill="#f2c14e"/>
+  </g>
+  <rect class="stage s4" x="702" y="96" width="120" height="54" rx="12"/>
+  <text class="sans title" x="762" y="129" text-anchor="middle">4  Improves</text>
+
+  <!-- captions -->
+  <text class="sans cap c1" x="312" y="172" text-anchor="middle">what ran, did it fail,</text>
+  <text class="sans cap c1" x="312" y="187" text-anchor="middle">did anyone check?</text>
+  <text class="sans cap c2" x="462" y="172" text-anchor="middle">what keeps going</text>
+  <text class="sans cap c2" x="462" y="187" text-anchor="middle">wrong on this PC</text>
+  <text class="sans cap c3" x="612" y="172" text-anchor="middle">coin-flip trials,</text>
+  <text class="sans cap c3" x="612" y="187" text-anchor="middle">not hunches</text>
+  <text class="sans cap c4" x="762" y="172" text-anchor="middle">a fix you approve,</text>
+  <text class="sans cap c4" x="762" y="187" text-anchor="middle">your AI can reuse</text>
+
+  <!-- return path -->
+  <path class="ret" d="M762 196 V 248 H 90 V 188"/>
+  <g class="card">
+    <rect x="667" y="234" width="190" height="28" rx="8" fill="#17332a" stroke="#4fd1a5" stroke-width="1.2"/>
+    <text class="sans" x="762" y="252.5" text-anchor="middle" fill="#bff0dc" font-size="12" font-weight="600">Verified lesson → back to you</text>
+  </g>
+
+  <text class="sans" x="24" y="34" fill="#e8f1ee" font-size="14" font-weight="600">CoreScout</text>
+  <text class="sans cap" x="104" y="34">everything stays on your computer</text>
+</svg>

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" width="900" height="330" role="img" aria-label="Illustration. Left: two things keep happening together, which CoreScout labels Seen together. Right: a coin flip decides whether to try the fix, and only the measured difference is labelled Verified.">
+  <style>
+    .bg { fill: #0e1513; }
+    .panel { fill: #131d1a; stroke: #24332f; stroke-width: 1.2; }
+    .sans { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; }
+    .h { fill: #e8f1ee; font-size: 15px; font-weight: 600; }
+    .sub { fill: #7f948e; font-size: 12px; }
+    .row { fill: #b9cbc5; font-size: 12px; }
+    .busy { fill: #7aa7ff; }
+    .fail { fill: #ff7a6b; }
+    .pass { fill: #4fd1a5; }
+    .heads { fill: #f2c14e; }
+    .tails { fill: #59665f; }
+
+    @keyframes show { 0% { opacity: 0 } 3%,92% { opacity: 1 } 97%,100% { opacity: 0 } }
+    .r { opacity: 0; animation: show 10s infinite both; }
+    .t1 { animation-delay: .2s } .t2 { animation-delay: .9s } .t3 { animation-delay: 1.6s }
+    .t4 { animation-delay: 2.3s } .t5 { animation-delay: 3.0s } .t6 { animation-delay: 3.7s }
+    .t7 { animation-delay: 4.6s }
+    @keyframes showEnd { 0%,45% { opacity: 0 } 50%,92% { opacity: 1 } 97%,100% { opacity: 0 } }
+    .end { animation: showEnd 10s infinite; }
+  </style>
+
+  <rect class="bg" width="900" height="330" rx="14"/>
+  <text class="sans sub" x="24" y="28">Illustration: how one hunch becomes a claim</text>
+
+  <!-- LEFT: seen together -->
+  <rect class="panel" x="24" y="42" width="414" height="268" rx="12"/>
+  <text class="sans h" x="44" y="72">Seen together</text>
+  <text class="sans sub" x="44" y="91">the tests failed when the PC was busy. A cause? Unknown.</text>
+
+  <g class="sans row">
+    <g class="r t1"><text x="44" y="124">run 1</text><circle class="busy" cx="130" cy="120" r="6"/><text x="142" y="124">busy</text><circle class="fail" cx="230" cy="120" r="6"/><text x="242" y="124">tests failed</text></g>
+    <g class="r t2"><text x="44" y="150">run 2</text><circle class="tails" cx="130" cy="146" r="6"/><text x="142" y="150">quiet</text><circle class="pass" cx="230" cy="146" r="6"/><text x="242" y="150">tests passed</text></g>
+    <g class="r t3"><text x="44" y="176">run 3</text><circle class="busy" cx="130" cy="172" r="6"/><text x="142" y="176">busy</text><circle class="fail" cx="230" cy="172" r="6"/><text x="242" y="176">tests failed</text></g>
+    <g class="r t4"><text x="44" y="202">run 4</text><circle class="busy" cx="130" cy="198" r="6"/><text x="142" y="202">busy</text><circle class="fail" cx="230" cy="198" r="6"/><text x="242" y="202">tests failed</text></g>
+    <g class="r t5"><text x="44" y="228">run 5</text><circle class="tails" cx="130" cy="224" r="6"/><text x="142" y="228">quiet</text><circle class="pass" cx="230" cy="224" r="6"/><text x="242" y="228">tests passed</text></g>
+  </g>
+  <g class="end">
+    <rect x="44" y="252" width="374" height="40" rx="8" fill="#1a2430" stroke="#7aa7ff" stroke-width="1"/>
+    <text class="sans" x="60" y="277" fill="#cfdcff" font-size="12.5"><tspan font-weight="700">Seen together.</tspan> Could be the load, could be anything.</text>
+  </g>
+
+  <!-- RIGHT: verified -->
+  <rect class="panel" x="462" y="42" width="414" height="268" rx="12"/>
+  <text class="sans h" x="482" y="72">Verified</text>
+  <text class="sans sub" x="482" y="91">a coin decides whether to run the tests on fewer cores.</text>
+
+  <g class="sans row">
+    <g class="r t1"><text x="482" y="124">run 6</text><circle class="heads" cx="566" cy="120" r="6"/><text x="578" y="124">fewer cores</text><circle class="pass" cx="690" cy="120" r="6"/><text x="702" y="124">passed</text></g>
+    <g class="r t2"><text x="482" y="150">run 7</text><circle class="tails" cx="566" cy="146" r="6"/><text x="578" y="150">as usual</text><circle class="fail" cx="690" cy="146" r="6"/><text x="702" y="150">failed</text></g>
+    <g class="r t3"><text x="482" y="176">run 8</text><circle class="heads" cx="566" cy="172" r="6"/><text x="578" y="176">fewer cores</text><circle class="pass" cx="690" cy="172" r="6"/><text x="702" y="176">passed</text></g>
+    <g class="r t4"><text x="482" y="202">run 9</text><circle class="tails" cx="566" cy="198" r="6"/><text x="578" y="202">as usual</text><circle class="pass" cx="690" cy="198" r="6"/><text x="702" y="202">passed</text></g>
+    <g class="r t5"><text x="482" y="228">run 10</text><circle class="heads" cx="566" cy="224" r="6"/><text x="578" y="228">fewer cores</text><circle class="pass" cx="690" cy="224" r="6"/><text x="702" y="228">passed</text></g>
+  </g>
+  <g class="end">
+    <rect x="482" y="252" width="374" height="40" rx="8" fill="#17332a" stroke="#4fd1a5" stroke-width="1"/>
+    <text class="sans" x="498" y="277" fill="#bff0dc" font-size="12.5"><tspan font-weight="700">Verified</tspan> only after enough flips to measure it.</text>
+  </g>
+</svg>

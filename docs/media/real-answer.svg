@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300" role="img" aria-label="Real output from the author's machine on 2026-10-04: an AI asks CoreScout what goes wrong here and gets two recurring failures back, one of which was never checked afterwards.">
+  <style>
+    .bg { fill: #0b0f0e; }
+    .bar { fill: #161d1b; }
+    .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; font-size: 13.5px; white-space: pre; }
+    .dim { fill: #6d7f79; }
+    .txt { fill: #d6e2de; }
+    .ai { fill: #c9a8ff; }
+    .ok { fill: #4fd1a5; }
+    .bad { fill: #ff8a7a; }
+    .warn { fill: #f2c14e; }
+    @keyframes show { 0% { opacity: 0 } 2%,93% { opacity: 1 } 98%,100% { opacity: 0 } }
+    .l { opacity: 0; animation: show 14s infinite both; }
+    .a1 { animation-delay: .3s } .a2 { animation-delay: 1.4s } .a3 { animation-delay: 2.3s } .a4 { animation-delay: 2.9s }
+    .a5 { animation-delay: 3.5s } .a6 { animation-delay: 4.1s } .a7 { animation-delay: 4.9s } .a8 { animation-delay: 5.5s }
+    .a9 { animation-delay: 6.5s } .a10 { animation-delay: 7.6s }
+    @keyframes blink { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+    .cur { animation: blink 1s infinite; }
+  </style>
+
+  <rect class="bg" width="900" height="300" rx="12"/>
+  <path class="bar" d="M12 0 H888 A12 12 0 0 1 900 12 V34 H0 V12 A12 12 0 0 1 12 0Z"/>
+  <circle cx="22" cy="17" r="5.5" fill="#ff5f57"/><circle cx="40" cy="17" r="5.5" fill="#febc2e"/><circle cx="58" cy="17" r="5.5" fill="#28c840"/>
+  <text class="mono dim" x="450" y="22" text-anchor="middle" font-size="12">real answer, author's machine, 2026-10-04</text>
+
+  <g class="mono">
+    <text class="l a1 ai" x="24" y="66">your AI  ›  before I rebuild chaos-rpg, what goes wrong here?</text>
+    <text class="l a2 dim" x="24" y="96">corescout_failures</text>
+
+    <text class="l a3 txt" x="24" y="126">  taskkill chaos-rpg.exe ; cargo build --release ... ; cp</text>
+    <text class="l a4" x="24" y="148"><tspan class="bad">    failed 5 of 5</tspan><tspan class="dim">   "The process chaos-rpg.exe not found"</tspan></text>
+    <text class="l a5" x="24" y="170"><tspan class="warn">    checked afterwards: 0 of 5</tspan><tspan class="dim">   nobody looked at the result</tspan></text>
+
+    <text class="l a6 txt" x="24" y="202">  ping -n -w</text>
+    <text class="l a7" x="24" y="224"><tspan class="bad">    failed 6 of 6</tspan><tspan class="dim">   exit code 1, retried 3 times</tspan></text>
+
+    <text class="l a8 dim" x="24" y="258">  246,277 observations · 4,166 AI actions · 32 machine states it found itself</text>
+    <rect class="l a10 cur" x="24" y="284" width="9" height="3" fill="#d6e2de"/>
+  </g>
+</svg>
