@@ -235,7 +235,7 @@ That converts the project's central claim from a promise into a checkable
 property:
 
 ```console
-$ cargo tree -p mirror-tools | grep corescout-substrate
+$ cargo tree -p corescout-mirror-tools | grep corescout-substrate
 $ echo $?
 1
 ```

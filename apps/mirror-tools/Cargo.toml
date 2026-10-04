@@ -1,5 +1,5 @@
 [package]
-name = "mirror-tools"
+name = "corescout-mirror-tools"
 description = "Programs that know a machine only through its mirror, and cannot reach hardware."
 version.workspace = true
 edition.workspace = true
