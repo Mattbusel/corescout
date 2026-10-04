@@ -142,7 +142,7 @@ pub fn run(
         // No reference yet means this run is establishing one, so it cannot be
         // wrong. Marking it unverified would make every first measurement a
         // failure.
-        verified: expected.map_or(true, |value| value == checksum),
+        verified: expected.is_none_or(|value| value == checksum),
         checksum,
     })
 }

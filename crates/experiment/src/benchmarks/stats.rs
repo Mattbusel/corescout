@@ -262,7 +262,7 @@ mod tests {
         // out in the tail, which is exactly the shape a latency user cares
         // about.
         let mut samples = vec![100.0; 95];
-        samples.extend(std::iter::repeat(900.0).take(5));
+        samples.extend(std::iter::repeat_n(900.0, 5));
         let s = Summary::from_samples(&samples).unwrap();
         assert_eq!(s.median, 100.0);
         assert!(s.tail_excess > 400.0, "p99 tail should be visible");

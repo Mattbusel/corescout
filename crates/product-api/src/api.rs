@@ -433,7 +433,7 @@ impl Api {
                 .into_iter()
                 .filter(|card| card.is_capability)
                 .filter(|card| {
-                    subject.map_or(true, |s| card.title.contains(s) || card.detail.contains(s))
+                    subject.is_none_or(|s| card.title.contains(s) || card.detail.contains(s))
                 })
                 .collect();
             return Ok(json!({
@@ -457,7 +457,7 @@ impl Api {
                 Some(operation) => engine.environment_faults_for(operation),
                 None => engine.environment_faults(),
             };
-            let matches = |fingerprint: &str| subject.map_or(true, |s| fingerprint.contains(s));
+            let matches = |fingerprint: &str| subject.is_none_or(|s| fingerprint.contains(s));
             let relevant: Vec<_> = engine
                 .failures()
                 .into_iter()
@@ -982,7 +982,7 @@ mod tests {
             )
             .expect("advise");
         assert_eq!(git["has_advice"], false, "{}", git["because"]);
-        assert!(git["machine"].as_array().map_or(true, |m| m.is_empty()));
+        assert!(git["machine"].as_array().is_none_or(|m| m.is_empty()));
 
         // And cargo still is, or the scoping has thrown the baby out.
         let cargo = api
@@ -1021,7 +1021,7 @@ mod tests {
             advice["has_advice"], false,
             "nothing is missing, so nothing is wrong"
         );
-        assert!(advice["machine"].as_array().map_or(true, |m| m.is_empty()));
+        assert!(advice["machine"].as_array().is_none_or(|m| m.is_empty()));
     }
 
     #[test]

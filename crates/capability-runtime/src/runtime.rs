@@ -301,7 +301,7 @@ impl Runtime {
                         // is newer than this workspace's minimum Rust.
                         let matched = expect
                             .as_ref()
-                            .map_or(true, |needle| output.contains(needle.as_str()));
+                            .is_none_or(|needle| output.contains(needle.as_str()));
                         StepResult {
                             describe,
                             exit_code: code,

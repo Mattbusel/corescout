@@ -22,8 +22,28 @@ use serde_json::{json, Value};
 
 use crate::tools;
 
-/// The protocol version this speaks.
-pub const PROTOCOL_VERSION: &str = "2024-11-05";
+/// The newest protocol version this speaks, offered to clients that ask for
+/// a version it does not know.
+pub const PROTOCOL_VERSION: &str = "2025-06-18";
+
+/// Every protocol version this server can speak, newest first. Tool results
+/// carry `structuredContent` and tools carry annotations, both of which
+/// arrived in these revisions; older clients ignore them.
+pub const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
+
+/// The version to answer a client with: the one it asked for when this
+/// server speaks it, otherwise the newest this server speaks (the client
+/// then decides whether it can continue).
+pub fn negotiate(requested: Option<&str>) -> &'static str {
+    requested
+        .and_then(|r| {
+            SUPPORTED_PROTOCOL_VERSIONS
+                .iter()
+                .find(|v| **v == r)
+                .copied()
+        })
+        .unwrap_or(PROTOCOL_VERSION)
+}
 
 /// Where a tool call goes.
 pub trait Backend {
@@ -128,10 +148,11 @@ impl<B: Backend> Server<B> {
                     let version = client.get("version").and_then(Value::as_str);
                     self.backend.connected(name, version);
                 }
+                let version = negotiate(params.get("protocolVersion").and_then(Value::as_str));
                 reply(
                     id,
                     json!({
-                        "protocolVersion": PROTOCOL_VERSION,
+                        "protocolVersion": version,
                         "capabilities": { "tools": { "listChanged": false } },
                         "serverInfo": {
                             "name": "corescout",
@@ -289,6 +310,41 @@ mod tests {
         );
         assert_eq!(reply["result"]["protocolVersion"], PROTOCOL_VERSION);
         assert_eq!(reply["result"]["serverInfo"]["name"], "corescout");
+        assert!(reply["result"]["instructions"].is_string());
+    }
+
+    #[test]
+    fn the_protocol_version_is_negotiated() {
+        for (asked, answered) in [
+            (Some("2024-11-05"), "2024-11-05"),
+            (Some("2025-03-26"), "2025-03-26"),
+            (Some("2025-06-18"), "2025-06-18"),
+            (Some("2099-01-01"), PROTOCOL_VERSION),
+            (None, PROTOCOL_VERSION),
+        ] {
+            let mut server = Server::new(Recording::new());
+            let mut params = json!({});
+            if let Some(v) = asked {
+                params["protocolVersion"] = json!(v);
+            }
+            let reply = ask(
+                &mut server,
+                json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":params}),
+            );
+            assert_eq!(
+                reply["result"]["protocolVersion"], answered,
+                "asked {asked:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_briefing_is_part_of_the_handshake() {
+        let mut server = Server::new(Recording::new());
+        let reply = ask(
+            &mut server,
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+        );
         assert!(reply["result"]["instructions"]
             .as_str()
             .expect("instructions")

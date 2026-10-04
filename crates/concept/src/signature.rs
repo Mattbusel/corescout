@@ -208,7 +208,7 @@ pub fn find_analogue(
         let Some(similarity) = foreign.similarity(signature) else {
             continue;
         };
-        if best.map_or(true, |(score, _, _)| similarity > score) {
+        if best.is_none_or(|(score, _, _)| similarity > score) {
             best = Some((similarity, name, signature));
         }
     }

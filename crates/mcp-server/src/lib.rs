@@ -26,5 +26,5 @@
 pub mod server;
 pub mod tools;
 
-pub use server::{Backend, Server, PROTOCOL_VERSION};
+pub use server::{negotiate, Backend, Server, PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS};
 pub use tools::{Tool, TOOLS};
