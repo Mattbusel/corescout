@@ -1,5 +1,13 @@
 # CoreScout
 
+<!-- outcome-block -->
+**Your AI stops rediscovering the same failures every session: CoreScout remembers what happened on your machine and tells your AI before it repeats a mistake.**
+
+**Why this over the alternatives:** Notes files and memory prompts only hold what someone wrote down. CoreScout observes it, and labels what it has verified separately from what it has only seen together. Free, open source, local-first, with an MCP server.
+
+**Guarantee:** if it doesn't do what this README says, [open an issue](https://github.com/Mattbusel/corescout/issues) and I'll fix it.
+<!-- outcome-block -->
+
 **Your AI forgets everything between sessions. CoreScout lets the computer remember what went wrong, test what actually fixes it, and tell the next AI.**
 
 [![crates.io](https://img.shields.io/crates/v/corescout-cli.svg?label=crates.io)](https://crates.io/crates/corescout-cli)
