@@ -126,12 +126,22 @@ jobs:
       - name: check what is about to ship
         run: cargo test -p corescout-integration --test installed -- --ignored
 
+      # CoreScout.mcpb: the MCP bridge and the service in one Claude Desktop
+      # extension. The script checks the manifest version and tool list against
+      # the workspace and runs an initialize + tools/list handshake on the
+      # staged server before it packs. The release's copy is what the official
+      # MCP Registry entry (com.tensorust/corescout) points at, by SHA-256.
+      - name: build the MCP bundle
+        shell: pwsh
+        run: pwsh scripts/mcpb.ps1 -BinDir target/release -OutDir dist
+
       - uses: actions/upload-artifact@v4
         with:
           name: installers
           path: |
             dist/*.exe
             dist/*.msi
+            dist/*.mcpb
 
   release:
     name: publish the release
@@ -167,6 +177,8 @@ jobs:
           CoreScout ${TAG}. Free, open source, local-first.
 
           **Windows, the full app:** \`CoreScoutSetup.exe\` (or \`CoreScout.msi\`). Installs the desktop app, the background service and the MCP bridge.
+
+          **Claude Desktop extension:** \`CoreScout.mcpb\` (Windows). Double-click it, or drag it into Claude Desktop's Extensions settings. It carries the MCP bridge and the service, so nothing else needs installing. Also listed in the official MCP Registry as \`com.tensorust/corescout\`.
 
           **Command line only** (the \`corescout\` CLI, \`corescout-service\` and \`corescout-mcp\`):
           - Windows: \`corescout-${TAG}-x86_64-pc-windows-msvc.zip\`

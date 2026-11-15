@@ -30,6 +30,12 @@
   transcript in whichever format it is; `--source` forces one. Codex setup is in
   `docs/CODEX.md`, Gemini CLI's in `docs/CLAIMS.md`.
 
+- The release carries `CoreScout.mcpb`, the MCP bridge and the service as one Claude Desktop
+  extension (Windows). `scripts/mcpb.ps1` builds it in the release workflow and refuses to pack
+  unless the manifest's version and tool list match the workspace and the staged server answers
+  `initialize` and `tools/list`. The bundle is listed in the official MCP Registry as
+  `com.tensorust/corescout`, pinned to the release asset by SHA-256.
+
 ## 1.3.0 (2026-11-14)
 
 - `corescout report` reads Claude Code transcripts (`~/.claude/projects/**/*.jsonl`)
