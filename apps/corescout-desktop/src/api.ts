@@ -230,6 +230,8 @@ export interface Privacy {
   bytes: number;
   telemetry: boolean;
   holdings: { kind: string; describes: string; count: number; agent_activity: boolean }[];
+  /** Copies of Claude Code transcripts kept by `corescout report`; absent when there are none. */
+  transcripts?: { path: string; describes: string; files: number; bytes: number };
 }
 
 export interface Diagnostics {

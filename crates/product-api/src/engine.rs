@@ -1539,11 +1539,26 @@ impl Engine {
                 agent_activity: kind.is_agent_activity(),
             });
         }
+        // `corescout report` copies every Claude Code conversation in here.
+        // They are whole AI conversations, so a page that "has to be true"
+        // names them and counts them.
+        let copies = corescout_storage::paths::claude_transcripts();
+        let (files, copied_bytes) = directory_usage(&copies);
+        let transcripts = (files > 0).then(|| view::TranscriptCopies {
+            path: copies.display().to_string(),
+            describes: "Copies of Claude Code conversations, kept by corescout report so they \
+                        outlive Claude Code's 30-day cleanup. Forgetting does not remove them; \
+                        deleting this folder does."
+                .into(),
+            files,
+            bytes: copied_bytes,
+        });
         Ok(view::Privacy {
             data_dir: dir.display().to_string(),
-            bytes: directory_bytes(&dir),
+            bytes: directory_usage(&dir).1,
             telemetry: false,
             holdings,
+            transcripts,
         })
     }
 
@@ -1861,14 +1876,46 @@ fn aggregate(snapshot: &MirrorSnapshot) -> [f32; FEATURES] {
     out
 }
 
-fn directory_bytes(dir: &std::path::Path) -> u64 {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return 0;
-    };
-    entries
-        .filter_map(|entry| entry.ok())
-        .filter_map(|entry| entry.metadata().ok())
-        .filter(|meta| meta.is_file())
-        .map(|meta| meta.len())
-        .sum()
+/// Files and bytes under a directory, at any depth. Symbolic links are not
+/// followed, so a link out of the data directory is not counted as being in it.
+fn directory_usage(dir: &std::path::Path) -> (u64, u64) {
+    let (mut files, mut bytes) = (0, 0);
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&next) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
+            if kind.is_dir() {
+                stack.push(entry.path());
+            } else if kind.is_file() {
+                if let Ok(meta) = entry.metadata() {
+                    files += 1;
+                    bytes += meta.len();
+                }
+            }
+        }
+    }
+    (files, bytes)
+}
+
+#[cfg(test)]
+mod usage_tests {
+    use super::directory_usage;
+
+    #[test]
+    fn directory_usage_counts_files_at_every_depth() {
+        // The Privacy page's byte count once skipped every subfolder, which is
+        // where `corescout report` keeps its transcript copies.
+        let dir = tempfile::tempdir().expect("a temporary directory");
+        std::fs::write(dir.path().join("top.redb"), b"12345").expect("write");
+        let deep = dir.path().join("claude-transcripts").join("proj").join("s");
+        std::fs::create_dir_all(&deep).expect("mkdir");
+        std::fs::write(deep.join("a.jsonl"), b"1234567890").expect("write");
+        assert_eq!(directory_usage(dir.path()), (2, 15));
+        assert_eq!(directory_usage(&dir.path().join("missing")), (0, 0));
+    }
 }

@@ -12,9 +12,16 @@ name = "corescout"
 path = "src/main.rs"
 
 [dependencies]
+serde = { workspace = true }
 serde_json = { workspace = true }
 corescout-core = { workspace = true }
 corescout-product-api = { workspace = true }
+# `report` keeps its copy of Claude Code's transcripts in CoreScout's data
+# directory, and this is where that directory is defined.
+corescout-storage = { workspace = true }
 # `run --placement` confines a child process to some of this machine's cores,
 # so unlike the rest of the command line it does reach hardware.
 corescout-substrate = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

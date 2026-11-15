@@ -300,6 +300,24 @@ pub struct Privacy {
     /// One row per kind of thing stored.
     #[serde(default)]
     pub holdings: Vec<Holding>,
+    /// The copies of Claude Code transcripts `corescout report` keeps, when
+    /// there are any. They are files rather than database records, so they
+    /// are not a [`Holding`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcripts: Option<TranscriptCopies>,
+}
+
+/// Copies of Claude Code transcripts kept in the data directory.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct TranscriptCopies {
+    /// The folder they are in.
+    pub path: String,
+    /// What they are, in plain words.
+    pub describes: String,
+    /// How many transcript files.
+    pub files: u64,
+    /// Bytes on disk.
+    pub bytes: u64,
 }
 
 /// One kind of thing CoreScout stores.

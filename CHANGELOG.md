@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.3.0 (2026-11-14)
+
+- `corescout report` reads Claude Code transcripts (`~/.claude/projects/**/*.jsonl`)
+  and finds the assistant turns that claimed success ("tests pass", "done", "fixed",
+  "deployed", "all green", ...). It prints the share of those claims in the last
+  `--days` days (30 by default) with no passing test, build or lint run in that turn
+  or the one before, and the ten most recent unbacked claims with session, time,
+  the claim and the last command with its exit code. `--card` prints a one-screen
+  card with no paths, session ids or message text; `--json` prints everything;
+  `--top <N>` lists N claims instead of ten. A `--days` larger than the history
+  means "everything" rather than overflowing.
+- A negation, a failure word or "when" after a claim qualifies it rather than
+  taking it back, so "All 52 tests pass, 0 failed.", "All tests pass with no
+  warnings." and "Fixed the crash when input is empty." are claims, and so is
+  "Tests are green". An admission after the claim ("Done, but I haven't run the
+  tests") still is not.
+- `report` copies new and grown transcripts into CoreScout's data directory
+  (`claude-transcripts/`) before reading, so the history survives Claude Code's
+  30-day cleanup. `--no-store` turns that off. The first copy says how much it is
+  about to copy before it starts and prints progress; a file that cannot be copied
+  is skipped and read in place, and a copy is renamed into place so it never
+  replaces a good one with half a file. `--from <DIR>` reads only `DIR`, in place,
+  and never touches the store.
+- The Privacy page lists the transcript copies with their count and size, and its
+  byte total now counts subfolders.
+- `corescout gate` is a Claude Code `Stop` hook: it exits 2, with a message for the
+  model, when the final assistant message claims success and no check passed in that
+  turn. It never blocks twice in a row and lets the stop through on anything it
+  cannot read. Setup is in `docs/CLAIMS.md`.
+
 ## 1.2.0 (2026-10-04)
 
 - `cargo install corescout-cli`, `corescout-service` and `corescout-mcp` now work: the

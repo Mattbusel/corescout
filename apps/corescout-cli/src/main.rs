@@ -13,6 +13,8 @@
 //! anything that wants to parse it, and it is the same object the app receives,
 //! not a summary of it.
 
+mod claims;
+mod report;
 mod watch;
 
 use corescout_core::error::{Error, Result};
@@ -41,6 +43,10 @@ SEEING WHAT IT KNOWS
     activity [N]            What has happened recently
     computer                What this machine is
     states                  The recurring states it found in itself
+
+CHECKING WHAT YOUR AI CLAIMS
+    report [OPTIONS]        Claude Code turns that said 'done' with no passing check
+    gate                    Claude Code Stop hook: block 'done' with no check run
 
 CONNECTING AN AI
     ai                      Which AI systems have connected
@@ -73,6 +79,15 @@ OPTIONS FOR run
                             a machine whose cores are not all the same.
     --quiet                 Say nothing of its own
 
+OPTIONS FOR report
+    --days <N>              How far back to look (30)
+    --top <N>               How many recent unbacked claims to list (10)
+    --card                  A one-screen card with no names or messages in it
+    --json                  Everything, for a program
+    --no-store              Do not keep a copy of the transcripts
+    --from <DIR>            Read transcripts from here, not ~/.claude/projects.
+                            Only that folder is read, in place; nothing is copied.
+
 OPTIONS
     --json                  The raw answer, as the app receives it
     -h, --help              This
@@ -81,6 +96,7 @@ EXAMPLES
     corescout run -- cargo build
     corescout run --placement fast -- cargo test
     corescout use cap-1
+    corescout report --days 7 --card
 
 Everything stays on this computer. Nothing is sent anywhere.
 ";
@@ -101,11 +117,22 @@ fn run(args: &[String]) -> Result<()> {
         print!("{USAGE}");
         return Ok(());
     }
-    // These two do not talk to the API the way everything else does: one runs
-    // a process and one is read from stdin inside somebody's agent loop.
+    // These do not talk to the API the way everything else does: one runs a
+    // process, two are read from stdin inside somebody's agent loop, and one
+    // reads transcripts straight from disk.
     match args[0].as_str() {
         "hook" => {
             let _ = watch::hook();
+            return Ok(());
+        }
+        "report" => return report::report(&args[1..]),
+        "gate" => {
+            // Exit 2 is how a Stop hook blocks, so the code leaves through the
+            // process like `run`'s does.
+            let code = report::gate(&args[1..]);
+            if code != 0 {
+                std::process::exit(code);
+            }
             return Ok(());
         }
         "run" => {
@@ -482,6 +509,15 @@ fn render(command: &str, answer: &Value) -> String {
                     text(&holding, "describes")
                 ));
             }
+            if let Some(copies) = answer.get("transcripts").filter(|c| c.is_object()) {
+                out.push_str(&format!(
+                    "{:>6}  {} ({} bytes, in {})\n",
+                    number(copies, "files"),
+                    text(copies, "describes"),
+                    number(copies, "bytes"),
+                    text(copies, "path"),
+                ));
+            }
         }
         "diagnostics" => {
             out.push_str(&format!(
@@ -627,11 +663,12 @@ mod tests {
             if name.is_empty() || name.starts_with('<') || name == "corescout" {
                 continue;
             }
-            // `run` and `hook` are answered before the API dispatch, because
-            // one runs a process and the other is read from stdin inside an
-            // agent loop. They are named here rather than skipped silently, so
-            // adding a third one has to be a deliberate act.
-            if matches!(name, "run" | "hook") {
+            // `run`, `hook`, `report` and `gate` are answered before the API
+            // dispatch: one runs a process, two are read from stdin inside an
+            // agent loop, and one reads transcripts from disk. They are named
+            // here rather than skipped silently, so adding another has to be a
+            // deliberate act.
+            if matches!(name, "run" | "hook" | "report" | "gate") {
                 continue;
             }
             let attempted = route(name, Some("x"), &args(&format!("{name} x --folder p")));
@@ -645,10 +682,11 @@ mod tests {
     }
 
     #[test]
-    fn the_two_commands_handled_before_the_dispatch_are_the_two_that_have_to_be() {
-        // `run` owns a child process and `hook` is read from stdin inside an
-        // agent loop. Everything else is one API call and must stay that way.
-        for name in ["run", "hook"] {
+    fn the_commands_handled_before_the_dispatch_are_the_ones_that_have_to_be() {
+        // `run` owns a child process, `hook` and `gate` are read from stdin
+        // inside an agent loop, and `report` reads transcripts from disk.
+        // Everything else is one API call and must stay that way.
+        for name in ["run", "hook", "report", "gate"] {
             let error = route(name, None, &args(name))
                 .expect_err("these are not API methods")
                 .to_string();
@@ -787,6 +825,49 @@ mod tests {
     fn a_timestamp_is_rendered_without_a_date_library() {
         assert_eq!(stamp(0), "00:00:00");
         assert_eq!(stamp(3_661_000), "01:01:01");
+    }
+
+    #[test]
+    fn the_privacy_page_names_the_transcript_copies() {
+        let answer = json!({
+            "data_dir": "D",
+            "bytes": 10,
+            "telemetry": false,
+            "holdings": [],
+            "transcripts": {
+                "path": "D/claude-transcripts",
+                "describes": "Copies of Claude Code conversations",
+                "files": 3,
+                "bytes": 7,
+            },
+        });
+        let text = render("privacy", &answer);
+        assert!(
+            text.contains(
+                "     3  Copies of Claude Code conversations (7 bytes, in D/claude-transcripts)"
+            ),
+            "{text}"
+        );
+        assert!(!render("privacy", &json!({"holdings": []})).contains("Copies"));
+    }
+
+    #[test]
+    fn every_report_option_is_in_the_usage() {
+        for option in [
+            "--days",
+            "--top",
+            "--card",
+            "--json",
+            "--no-store",
+            "--from",
+        ] {
+            let block = USAGE
+                .split("OPTIONS FOR report")
+                .nth(1)
+                .and_then(|rest| rest.split("\n\n").next())
+                .expect("a report block");
+            assert!(block.contains(option), "{option} missing from:\n{block}");
+        }
     }
 
     #[test]

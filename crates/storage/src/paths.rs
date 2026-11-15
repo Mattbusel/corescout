@@ -50,6 +50,15 @@ pub fn ring() -> PathBuf {
     data_dir().join("mirror.ring")
 }
 
+/// Where `corescout report` keeps its copies of Claude Code transcripts, so
+/// they outlive Claude Code's own 30-day cleanup.
+///
+/// It is under the data directory like everything else, so deleting that
+/// directory deletes these too, and the Privacy page lists and counts it.
+pub fn claude_transcripts() -> PathBuf {
+    data_dir().join("claude-transcripts")
+}
+
 /// Where the service writes the file describing how to reach it.
 ///
 /// The desktop app, the CLI and the MCP bridge all read this rather than

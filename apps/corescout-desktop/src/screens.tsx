@@ -838,6 +838,18 @@ export function Settings({
                   ) : null}
                 </div>
               ))}
+            {privacy.data.transcripts ? (
+              <div className="card">
+                <div className="card-head">
+                  <h3>{privacy.data.transcripts.describes}</h3>
+                  <span className="mono faint">{privacy.data.transcripts.files}</span>
+                </div>
+                <div className="card-meta">
+                  <span className="mono">{privacy.data.transcripts.path}</span>
+                  <span>{bytes(privacy.data.transcripts.bytes)} on disk</span>
+                </div>
+              </div>
+            ) : null}
             <p className="faint" style={{ marginTop: "var(--s3)" }}>
               Commands are stored with secrets stripped before anything is
               written down. Source code is never read or stored.
