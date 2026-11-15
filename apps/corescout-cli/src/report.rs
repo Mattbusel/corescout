@@ -1,12 +1,16 @@
 //! `corescout report` and `corescout gate`: did the AI check before it said
 //! it was done?
 //!
-//! Both read Claude Code transcripts directly from disk and never talk to the
-//! CoreScout service, so they work whether or not it is running.
+//! Both read AI coding-agent transcripts directly from disk and never talk to
+//! the CoreScout service, so they work whether or not it is running. Claude
+//! Code, OpenAI Codex CLI and Gemini CLI are read (see `crate::agents`), each
+//! into the same claims and checks; `--source claude|codex|gemini|all`
+//! narrows a report to some of them.
 //!
 //! # `corescout report`
 //!
-//! Reads every transcript under `~/.claude/projects` (or `--from <DIR>`), finds
+//! Reads every transcript under `~/.claude/projects`, `~/.codex/sessions` and
+//! `~/.gemini/tmp` (or `--from <DIR>`), finds
 //! the assistant turns that claimed success, and says how many of them in the
 //! last `--days` days (30 by default) had no passing test, build or lint run
 //! in that turn or the one before. It lists the ten most recent unbacked
@@ -27,10 +31,11 @@
 //!
 //! # `corescout gate`
 //!
-//! A Claude Code `Stop` hook. It reads the hook's JSON from stdin, opens the
+//! A Claude Code or Codex `Stop` hook, or a Gemini CLI `AfterAgent` hook. It
+//! reads the hook's JSON from stdin, opens the
 //! transcript it names, and when the last assistant message claims success and
 //! no check passed in that turn it exits 2 with a message on stderr, which
-//! Claude Code shows to the model and which keeps it working. Anything it
+//! the agent shows to the model and which keeps it working. Anything it
 //! cannot read lets the stop through: a gate that breaks somebody's session
 //! because of its own bug is a gate they uninstall. When the hook payload says
 //! the stop is already the result of a block (`stop_hook_active`), it lets the
@@ -44,6 +49,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use corescout_core::error::{Error, Result};
 use serde_json::{json, Value};
 
+use crate::agents::{self, Agent};
 use crate::claims::{self, Claim};
 
 /// Options for `corescout report`.
@@ -55,6 +61,9 @@ pub struct ReportOptions {
     pub store: bool,
     pub from: Option<PathBuf>,
     pub top: usize,
+    /// The agents whose transcripts to read (`--source`); all of them unless
+    /// asked otherwise.
+    pub sources: Vec<Agent>,
 }
 
 impl ReportOptions {
@@ -67,6 +76,7 @@ impl ReportOptions {
             store: true,
             from: None,
             top: 10,
+            sources: Agent::ALL.to_vec(),
         };
         let mut at = 0;
         while at < args.len() {
@@ -94,9 +104,13 @@ impl ReportOptions {
                     options.from = Some(PathBuf::from(value(at)?));
                     at += 1;
                 }
+                "--source" => {
+                    options.sources = agents::parse_sources(value(at)?).map_err(Error::invalid)?;
+                    at += 1;
+                }
                 other => {
                     return Err(Error::invalid(format!(
-                        "{other:?} is not an option for report; try --days, --top, --card, --json, --no-store or --from"
+                        "{other:?} is not an option for report; try --days, --top, --card, --json, --no-store, --from or --source"
                     )))
                 }
             }
@@ -134,6 +148,14 @@ pub fn store_dir() -> PathBuf {
 /// Every `.jsonl` file under a directory, at any depth, with its path
 /// relative to that directory.
 fn transcripts_under(root: &Path) -> Vec<(PathBuf, PathBuf)> {
+    files_under(root, |path| {
+        path.extension().is_some_and(|ext| ext == "jsonl")
+    })
+}
+
+/// Every file under a directory, at any depth, that `keep` accepts (given
+/// its path relative to the directory), with that relative path.
+fn files_under(root: &Path, keep: impl Fn(&Path) -> bool) -> Vec<(PathBuf, PathBuf)> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -147,8 +169,8 @@ fn transcripts_under(root: &Path) -> Vec<(PathBuf, PathBuf)> {
             };
             if kind.is_dir() {
                 stack.push(path);
-            } else if path.extension().is_some_and(|ext| ext == "jsonl") {
-                if let Ok(relative) = path.strip_prefix(root) {
+            } else if let Ok(relative) = path.strip_prefix(root) {
+                if keep(relative) {
                     out.push((path.clone(), relative.to_path_buf()));
                 }
             }
@@ -276,18 +298,67 @@ pub fn collect(root: &Path, since_ms: i64) -> (Vec<(String, Claim)>, usize) {
     collect_files(transcripts_under(root), since_ms)
 }
 
-/// Read the given transcripts, each a `(path, path relative to its projects
-/// folder)` pair, and keep the claims made since `since_ms`, each with the
-/// project folder it came from.
+/// Read the given Claude Code transcripts, each a `(path, path relative to
+/// its projects folder)` pair, and keep the claims made since `since_ms`,
+/// each with the project folder it came from.
+#[cfg(test)]
 pub fn collect_files(
     files: Vec<(PathBuf, PathBuf)>,
     since_ms: i64,
 ) -> (Vec<(String, Claim)>, usize) {
+    let inputs = files
+        .into_iter()
+        .map(|(path, relative)| Input {
+            path,
+            relative,
+            agent: Some(Agent::Claude),
+        })
+        .collect();
+    let (claims, read) = collect_inputs(inputs, since_ms, &Agent::ALL);
+    (claims, read.values().sum())
+}
+
+/// One transcript for the report to read.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Input {
+    /// Where it is.
+    pub path: PathBuf,
+    /// Its path relative to the folder it was found in. For Claude Code the
+    /// first component is the project folder.
+    pub relative: PathBuf,
+    /// The agent that wrote it, or `None` to tell from its contents.
+    pub agent: Option<Agent>,
+}
+
+impl Input {
+    fn known(agent: Agent, (path, relative): (PathBuf, PathBuf)) -> Input {
+        Input {
+            path,
+            relative,
+            agent: Some(agent),
+        }
+    }
+}
+
+/// How many transcripts were read, per agent.
+pub type ReadCounts = BTreeMap<Agent, usize>;
+
+/// Read the given transcripts and keep the claims made since `since_ms` by
+/// the agents in `sources`, each with the project it came from: the one the
+/// transcript names, else the first folder of its relative path.
+pub fn collect_inputs(
+    inputs: Vec<Input>,
+    since_ms: i64,
+    sources: &[Agent],
+) -> (Vec<(String, Claim)>, ReadCounts) {
     let mut out = Vec::new();
-    let mut read = 0;
-    for (path, relative) in files {
+    let mut read = ReadCounts::new();
+    for input in inputs {
+        if input.agent.is_some_and(|agent| !sources.contains(&agent)) {
+            continue;
+        }
         // A file last written before the window holds nothing inside it.
-        let modified_ms = std::fs::metadata(&path)
+        let modified_ms = std::fs::metadata(&input.path)
             .and_then(|m| m.modified())
             .ok()
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
@@ -295,17 +366,37 @@ pub fn collect_files(
         if modified_ms.is_some_and(|ms| ms < since_ms) {
             continue;
         }
-        let Ok(bytes) = std::fs::read(&path) else {
+        let Ok(bytes) = std::fs::read(&input.path) else {
             continue;
         };
-        read += 1;
         let text = String::from_utf8_lossy(&bytes);
-        let project = relative
-            .components()
-            .next()
-            .map(|c| c.as_os_str().to_string_lossy().into_owned())
-            .unwrap_or_default();
-        for claim in claims::analyse(&text).claims {
+        let agent = match input.agent {
+            Some(agent) => agent,
+            None => {
+                let found = agents::detect(&text);
+                // Only Gemini CLI writes sessions as plain `.json`; any other
+                // JSON file in the folder is not a transcript.
+                let json = input.path.extension().is_some_and(|ext| ext == "json");
+                if json && found != Agent::Gemini {
+                    continue;
+                }
+                found
+            }
+        };
+        if !sources.contains(&agent) {
+            continue;
+        }
+        *read.entry(agent).or_default() += 1;
+        let transcript = agent.analyse(&text);
+        let project = transcript.project.clone().unwrap_or_else(|| {
+            input
+                .relative
+                .components()
+                .next()
+                .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                .unwrap_or_default()
+        });
+        for claim in transcript.claims {
             if claim.at_ms.is_some_and(|at| at >= since_ms) {
                 out.push((project.clone(), claim));
             }
@@ -314,8 +405,38 @@ pub fn collect_files(
     (out, read)
 }
 
+/// "Claude Code", "Claude Code and Codex", "Claude Code, Codex and Gemini CLI".
+fn agent_names(agents: &[Agent]) -> String {
+    let labels: Vec<&str> = agents.iter().map(|a| a.label()).collect();
+    match labels.as_slice() {
+        [] => String::new(),
+        [one] => one.to_string(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    }
+}
+
+/// The agents a summary covers: those with a transcript read, else those
+/// asked for.
+fn summary_agents(summary: &Value) -> Vec<Agent> {
+    let read: Vec<Agent> = summary["sources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str()?.parse().ok())
+        .collect();
+    if !read.is_empty() {
+        return read;
+    }
+    summary["sources_searched"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str()?.parse().ok())
+        .collect()
+}
+
 /// The answer `report` gives, as one JSON object.
-pub fn summarise(claims: &[(String, Claim)], options: &ReportOptions, read: usize) -> Value {
+pub fn summarise(claims: &[(String, Claim)], options: &ReportOptions, read: &ReadCounts) -> Value {
     let total = claims.len();
     let unbacked: Vec<&(String, Claim)> = claims.iter().filter(|(_, c)| !c.backed).collect();
     let percent = if total == 0 {
@@ -341,6 +462,7 @@ pub fn summarise(claims: &[(String, Claim)], options: &ReportOptions, read: usiz
         .take(options.top)
         .map(|(project, claim)| {
             json!({
+                "source": claim.agent.key(),
                 "session": claim.session,
                 "project": project,
                 "timestamp": claim.timestamp,
@@ -352,9 +474,37 @@ pub fn summarise(claims: &[(String, Claim)], options: &ReportOptions, read: usiz
         })
         .collect();
 
+    let mut by_agent: BTreeMap<Agent, (usize, usize)> = BTreeMap::new();
+    for (_, claim) in claims {
+        let entry = by_agent.entry(claim.agent).or_default();
+        entry.0 += 1;
+        if !claim.backed {
+            entry.1 += 1;
+        }
+    }
+    let share = |unbacked: usize, all: usize| {
+        if all == 0 {
+            0.0
+        } else {
+            (unbacked as f64 * 1000.0 / all as f64).round() / 10.0
+        }
+    };
+
     json!({
         "days": options.days,
-        "transcripts_read": read,
+        "transcripts_read": read.values().sum::<usize>(),
+        "sources": read.iter().filter(|(_, n)| **n > 0).map(|(a, _)| a.key()).collect::<Vec<_>>(),
+        "sources_searched": options.sources.iter().map(|a| a.key()).collect::<Vec<_>>(),
+        "transcripts_by_source": read.iter().map(|(a, n)| (a.key().to_string(), json!(n))).collect::<serde_json::Map<_, _>>(),
+        "by_source": by_agent
+            .iter()
+            .map(|(agent, (all, unbacked))| json!({
+                "source": agent.key(),
+                "claims": all,
+                "unbacked": unbacked,
+                "unbacked_percent": share(*unbacked, *all),
+            }))
+            .collect::<Vec<_>>(),
         "claims": total,
         "unbacked": unbacked.len(),
         "unbacked_percent": (percent * 10.0).round() / 10.0,
@@ -384,7 +534,12 @@ pub fn render_report(summary: &Value) -> String {
     let days = summary["days"].as_u64().unwrap_or(0);
     let total = summary["claims"].as_u64().unwrap_or(0);
     let unbacked = summary["unbacked"].as_u64().unwrap_or(0);
-    out.push_str(&format!("Claude Code success claims, last {days} days\n\n"));
+    let agents = summary_agents(summary);
+    let several = agents.len() > 1;
+    out.push_str(&format!(
+        "{} success claims, last {days} days\n\n",
+        agent_names(&agents)
+    ));
     if total == 0 {
         out.push_str(&format!(
             "No assistant turn claimed success in {} transcripts read.\n",
@@ -402,6 +557,21 @@ pub fn render_report(summary: &Value) -> String {
         summary["projects"].as_u64().unwrap_or(0),
         summary["transcripts_read"].as_u64().unwrap_or(0),
     ));
+    if several {
+        for row in summary["by_source"].as_array().cloned().unwrap_or_default() {
+            let label = row["source"]
+                .as_str()
+                .and_then(|key| key.parse::<Agent>().ok())
+                .map(Agent::label)
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "    {label}: {:.1}% unbacked ({} of {})\n",
+                row["unbacked_percent"].as_f64().unwrap_or(0.0),
+                row["unbacked"].as_u64().unwrap_or(0),
+                row["claims"].as_u64().unwrap_or(0),
+            ));
+        }
+    }
     let top = summary["top_unbacked"]
         .as_array()
         .cloned()
@@ -413,8 +583,15 @@ pub fn render_report(summary: &Value) -> String {
     for item in top {
         let session = item["session"].as_str().unwrap_or_default();
         let stamp = item["timestamp"].as_str().unwrap_or_default();
+        let agent = match item["source"]
+            .as_str()
+            .and_then(|k| k.parse::<Agent>().ok())
+        {
+            Some(agent) if several => format!("{}  ", agent.label()),
+            _ => String::new(),
+        };
         out.push_str(&format!(
-            "\n  {} UTC  session {}  {}\n    \"{}\"\n",
+            "\n  {} UTC  {agent}session {}  {}\n    \"{}\"\n",
             stamp.get(..16).unwrap_or(stamp).replace('T', " "),
             session.get(..8).unwrap_or(session),
             item["project"].as_str().unwrap_or_default(),
@@ -439,10 +616,12 @@ pub fn render_report(summary: &Value) -> String {
 /// or what anybody was working on: counts and the kinds of claim only.
 pub fn render_card(summary: &Value) -> String {
     const WIDTH: usize = 52;
+    let agents = summary_agents(summary);
     let mut lines = vec![
         "CoreScout: did the AI check before it said done?".to_string(),
         format!(
-            "Claude Code, last {} days",
+            "{}, last {} days",
+            agent_names(&agents),
             summary["days"].as_u64().unwrap_or(0)
         ),
         String::new(),
@@ -468,6 +647,25 @@ pub fn render_card(summary: &Value) -> String {
             all,
             share
         ));
+    }
+    if agents.len() > 1 {
+        lines.push(String::new());
+        lines.push(format!("  {:<16}{:>8}{:>11}", "agent", "turns", "unbacked"));
+        for row in summary["by_source"].as_array().cloned().unwrap_or_default() {
+            let all = row["claims"].as_u64().unwrap_or(0);
+            let unbacked = row["unbacked"].as_u64().unwrap_or(0);
+            let label = row["source"]
+                .as_str()
+                .and_then(|key| key.parse::<Agent>().ok())
+                .map(Agent::label)
+                .unwrap_or_default();
+            lines.push(format!(
+                "  {:<16}{:>8}{:>10}%",
+                label,
+                all,
+                (unbacked * 100).checked_div(all).unwrap_or(0)
+            ));
+        }
     }
     lines.push(String::new());
     lines.push(format!(
@@ -554,14 +752,11 @@ fn sync_and_list(source: &Path, store: &Path, quiet: bool) -> Vec<(PathBuf, Path
     files
 }
 
-/// `corescout report`.
-pub fn report(args: &[String]) -> Result<()> {
-    let options = ReportOptions::parse(args)?;
-    let source = match &options.from {
-        Some(dir) => dir.clone(),
-        None => claude_projects_dir()
-            .ok_or_else(|| Error::invalid("cannot find a home directory".to_string()))?,
-    };
+/// The Claude Code transcripts to read: the store's copies (after bringing
+/// them up to date), else the originals. `None` when there are neither.
+fn claude_inputs(options: &ReportOptions) -> Result<Option<Vec<Input>>> {
+    let source = claude_projects_dir()
+        .ok_or_else(|| Error::invalid("cannot find a home directory".to_string()))?;
     let store = store_dir();
     let files = if options.store && source.is_dir() {
         sync_and_list(&source, &store, options.json)
@@ -571,15 +766,104 @@ pub fn report(args: &[String]) -> Result<()> {
     } else if source.is_dir() {
         transcripts_under(&source)
     } else {
-        return Err(Error::invalid(format!(
-            "no transcripts at {}; is Claude Code installed? --from <DIR> points somewhere else",
-            source.display()
-        )));
+        return Ok(None);
     };
+    Ok(Some(
+        files
+            .into_iter()
+            .map(|file| Input::known(Agent::Claude, file))
+            .collect(),
+    ))
+}
 
+/// The transcripts of an agent other than Claude Code, read where the agent
+/// keeps them. `None` when none of its folders exist.
+fn agent_inputs(agent: Agent) -> Option<Vec<Input>> {
+    let mut found = None;
+    for dir in agent.default_dirs() {
+        if !dir.is_dir() {
+            continue;
+        }
+        let files = files_under(&dir, |relative| agent.owns_path(relative));
+        found
+            .get_or_insert_with(Vec::new)
+            .extend(files.into_iter().map(|file| Input::known(agent, file)));
+    }
+    found
+}
+
+/// Every transcript `report` should read, and the agents whose folders
+/// exist on this machine.
+fn inputs(options: &ReportOptions) -> Result<(Vec<Input>, Vec<Agent>)> {
+    if let Some(dir) = &options.from {
+        if !dir.is_dir() {
+            return Err(Error::invalid(format!(
+                "no transcripts at {}",
+                dir.display()
+            )));
+        }
+        // Whatever is in the folder, read in place; each file says which
+        // agent wrote it.
+        let files = files_under(dir, |path| {
+            path.extension()
+                .is_some_and(|ext| ext == "jsonl" || ext == "json")
+        });
+        let inputs = files
+            .into_iter()
+            .map(|(path, relative)| Input {
+                path,
+                relative,
+                agent: None,
+            })
+            .collect();
+        return Ok((inputs, options.sources.clone()));
+    }
+
+    let mut all = Vec::new();
+    let mut present = Vec::new();
+    for agent in &options.sources {
+        let found = match agent {
+            Agent::Claude => claude_inputs(options)?,
+            other => agent_inputs(*other),
+        };
+        if let Some(found) = found {
+            present.push(*agent);
+            all.extend(found);
+        }
+    }
+    if present.is_empty() {
+        if options.sources == [Agent::Claude] {
+            let source = claude_projects_dir().unwrap_or_default();
+            return Err(Error::invalid(format!(
+                "no transcripts at {}; is Claude Code installed? --from <DIR> points somewhere else",
+                source.display()
+            )));
+        }
+        let looked: Vec<String> = options
+            .sources
+            .iter()
+            .flat_map(|agent| agent.default_dirs())
+            .map(|dir| dir.display().to_string())
+            .collect();
+        return Err(Error::invalid(format!(
+            "no transcripts from {} at {}; --from <DIR> points somewhere else",
+            agent_names(&options.sources),
+            looked.join(", ")
+        )));
+    }
+    Ok((all, present))
+}
+
+/// `corescout report`.
+pub fn report(args: &[String]) -> Result<()> {
+    let mut options = ReportOptions::parse(args)?;
+    let (files, present) = inputs(&options)?;
     let since = window_start(now_ms(), options.days);
-    let (claims, read) = collect_files(files, since);
-    let summary = summarise(&claims, &options, read);
+    let (claims, read) = collect_inputs(files, since, &options.sources);
+    // The header names the agents that are installed here, not every one
+    // that could have been.
+    options.sources = present;
+    let summary = summarise(&claims, &options, &read);
     if options.json {
         println!(
             "{}",
@@ -602,11 +886,26 @@ pub enum Verdict {
     Block(String),
 }
 
-/// Decide a Stop hook payload.
+/// Decide a Stop hook payload, telling the transcript's format from its
+/// contents.
 ///
 /// `read` opens the transcript the payload names; it is a parameter so the
 /// tests can hand one over without a file.
+#[cfg(test)]
 pub fn decide(payload: &Value, read: impl Fn(&Path) -> Option<String>) -> Verdict {
+    decide_as(payload, None, read)
+}
+
+/// Decide a hook payload from Claude Code (`Stop`), Codex (`Stop`) or Gemini
+/// CLI (`AfterAgent`). All three send `transcript_path` and
+/// `stop_hook_active`; the final message is `last_assistant_message` for
+/// Claude Code and Codex and `prompt_response` for Gemini CLI. `agent` forces
+/// the transcript format; `None` tells it from the contents.
+pub fn decide_as(
+    payload: &Value,
+    agent: Option<Agent>,
+    read: impl Fn(&Path) -> Option<String>,
+) -> Verdict {
     if payload["stop_hook_active"].as_bool() == Some(true) {
         return Verdict::Allow;
     }
@@ -616,12 +915,15 @@ pub fn decide(payload: &Value, read: impl Fn(&Path) -> Option<String>) -> Verdic
     let Some(text) = read(Path::new(path)) else {
         return Verdict::Allow;
     };
-    let transcript = claims::analyse(&text);
+    let agent = agent.unwrap_or_else(|| agents::detect(&text));
+    let transcript = agent.analyse(&text);
     let last = &transcript.final_turn;
-    // Newer Claude Code versions put the final message in the payload, which
-    // is safer than trusting the transcript to have been flushed.
+    // Newer Claude Code versions, Codex and Gemini CLI put the final message
+    // in the payload, which is safer than trusting the transcript to have
+    // been flushed.
     let message = payload["last_assistant_message"]
         .as_str()
+        .or(payload["prompt_response"].as_str())
         .map(str::to_string)
         .or_else(|| last.last_text.clone());
     let Some(message) = message else {
@@ -652,8 +954,21 @@ pub fn decide(payload: &Value, read: impl Fn(&Path) -> Option<String>) -> Verdic
 /// `corescout gate`. Returns the exit code: 2 to block, 0 otherwise.
 pub fn gate(args: &[String]) -> i32 {
     let loud = std::env::var_os("CORESCOUT_GATE_DEBUG").is_some();
+    // `--source <AGENT>` reads the transcript as that agent's format instead
+    // of telling it from the contents; `all` (or nothing) tells.
+    let agent = match args.iter().position(|a| a == "--source") {
+        Some(at) => match args.get(at + 1).map(|v| agents::parse_sources(v)) {
+            Some(Ok(sources)) if sources.len() == 1 => Some(sources[0]),
+            Some(Ok(_)) => None,
+            _ => {
+                eprintln!("corescout gate: --source needs claude, codex, gemini or all");
+                return 0;
+            }
+        },
+        None => None,
+    };
     // `--transcript <PATH>` judges a file directly, for trying the gate out
-    // by hand; Claude Code sends the hook payload on stdin.
+    // by hand; the agent sends the hook payload on stdin.
     let payload = match args.iter().position(|a| a == "--transcript") {
         Some(at) => match args.get(at + 1) {
             Some(path) => json!({ "transcript_path": path }),
@@ -678,7 +993,12 @@ pub fn gate(args: &[String]) -> i32 {
             }
         }
     };
-    match decide(&payload, |path| std::fs::read_to_string(path).ok()) {
+    let read = |path: &Path| {
+        std::fs::read(path)
+            .ok()
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+    };
+    match decide_as(&payload, agent, read) {
         Verdict::Allow => {
             if loud {
                 eprintln!("corescout gate: allowed");
@@ -938,7 +1258,11 @@ mod tests {
         let (claims, read) = collect(dir.path(), 0);
         assert_eq!(read, 3);
         let options = ReportOptions::parse(&[]).unwrap();
-        let summary = summarise(&claims, &options, read);
+        let summary = summarise(
+            &claims,
+            &options,
+            &ReadCounts::from([(Agent::Claude, read)]),
+        );
         assert_eq!(summary["claims"], 4);
         assert_eq!(summary["unbacked"], 2);
         assert_eq!(summary["unbacked_percent"], 50.0);
@@ -984,8 +1308,265 @@ mod tests {
 
     #[test]
     fn an_empty_report_says_so() {
-        let summary = summarise(&[], &ReportOptions::parse(&[]).unwrap(), 5);
+        let summary = summarise(
+            &[],
+            &ReportOptions::parse(&[]).unwrap(),
+            &ReadCounts::from([(Agent::Claude, 5)]),
+        );
         assert!(render_report(&summary).contains("No assistant turn claimed success in 5"));
         let _ = render_card(&summary);
+    }
+
+    const CODEX_PAGINATED: &str = include_str!("../fixtures/codex/paginated.jsonl");
+    const CODEX_LEGACY: &str = include_str!("../fixtures/codex/legacy.jsonl");
+    const GEMINI_SESSION: &str = include_str!("../fixtures/gemini/session.jsonl");
+    const GEMINI_LEGACY: &str = include_str!("../fixtures/gemini/legacy.json");
+
+    #[test]
+    fn source_is_parsed_and_defaults_to_every_agent() {
+        assert_eq!(
+            ReportOptions::parse(&[]).unwrap().sources,
+            Agent::ALL.to_vec()
+        );
+        assert_eq!(
+            ReportOptions::parse(&args("--source codex"))
+                .unwrap()
+                .sources,
+            vec![Agent::Codex]
+        );
+        assert_eq!(
+            ReportOptions::parse(&args("--source all")).unwrap().sources,
+            Agent::ALL.to_vec()
+        );
+        assert!(ReportOptions::parse(&args("--source")).is_err());
+        let error = ReportOptions::parse(&args("--source cursor"))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("codex"), "{error}");
+    }
+
+    /// A folder like `--from` gets: one transcript from each agent, plus
+    /// JSON that is not a transcript.
+    fn mixed_folder() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "claude-proj/s.jsonl",
+            &Script::new()
+                .user("go")
+                .bash("cargo test", 0, "ok")
+                .say("All tests pass.")
+                .user("ship it")
+                .say("Deployed.")
+                .text(),
+        );
+        write(
+            dir.path(),
+            "codex/2026/11/14/rollout-a.jsonl",
+            CODEX_PAGINATED,
+        );
+        write(dir.path(), "codex/2025/10/01/rollout-b.jsonl", CODEX_LEGACY);
+        write(
+            dir.path(),
+            "gemini/9c1f/chats/session-a.jsonl",
+            GEMINI_SESSION,
+        );
+        write(
+            dir.path(),
+            "gemini/4e2b/chats/session-b.json",
+            GEMINI_LEGACY,
+        );
+        write(
+            dir.path(),
+            "gemini/4e2b/logs.json",
+            "[{\"sessionId\":\"x\",\"type\":\"user\"}]",
+        );
+        write(dir.path(), "settings.json", "{\"hooks\":{}}");
+        dir
+    }
+
+    fn from_inputs(dir: &Path) -> Vec<Input> {
+        let options =
+            ReportOptions::parse(&["--from".to_string(), dir.display().to_string()]).unwrap();
+        inputs(&options).unwrap().0
+    }
+
+    #[test]
+    fn a_folder_of_every_agent_is_read_with_each_format() {
+        let dir = mixed_folder();
+        let (claims, read) = collect_inputs(from_inputs(dir.path()), 0, &Agent::ALL);
+        assert_eq!(
+            read,
+            ReadCounts::from([(Agent::Claude, 1), (Agent::Codex, 2), (Agent::Gemini, 2)])
+        );
+        let count = |agent: Agent| claims.iter().filter(|(_, c)| c.agent == agent).count();
+        assert_eq!(count(Agent::Claude), 2);
+        assert_eq!(count(Agent::Codex), 5);
+        assert_eq!(count(Agent::Gemini), 5);
+        // Codex names its working directory; that is the project.
+        assert!(claims
+            .iter()
+            .any(|(project, c)| c.agent == Agent::Codex && project == "/home/dev/parser"));
+
+        let mut options = ReportOptions::parse(&[]).unwrap();
+        options.sources = read.keys().copied().collect();
+        let summary = summarise(&claims, &options, &read);
+        assert_eq!(summary["transcripts_read"], 5);
+        assert_eq!(summary["sources"], json!(["claude", "codex", "gemini"]));
+        assert_eq!(summary["transcripts_by_source"]["codex"], 2);
+        let by_source = summary["by_source"].as_array().unwrap();
+        assert_eq!(by_source.len(), 3);
+        assert_eq!(by_source[1]["source"], "codex");
+        assert_eq!(by_source[1]["claims"], 5);
+        // Codex: the failed `npm test` turn is the only unbacked claim.
+        assert_eq!(by_source[1]["unbacked"], 1);
+        assert!(summary["top_unbacked"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|t| t["source"].is_string()));
+
+        let text = render_report(&summary);
+        assert!(
+            text.starts_with("Claude Code, Codex and Gemini CLI success claims, last 30 days"),
+            "{text}"
+        );
+        assert!(
+            text.contains("    Codex: 20.0% unbacked (1 of 5)"),
+            "{text}"
+        );
+        assert!(text.contains("Gemini CLI  session "), "{text}");
+
+        let card = render_card(&summary);
+        assert!(
+            card.contains("  Codex                  5        20%"),
+            "{card}"
+        );
+        assert!(card.lines().all(|l| l.chars().count() == 56), "{card}");
+        for secret in [
+            "/home/dev",
+            "npm test",
+            "parseDate",
+            "6f1d2a40",
+            "9c1f0e7a5b",
+        ] {
+            assert!(!card.contains(secret), "card leaks {secret}:\n{card}");
+        }
+    }
+
+    #[test]
+    fn source_narrows_the_report_to_one_agent() {
+        let dir = mixed_folder();
+        let (claims, read) = collect_inputs(from_inputs(dir.path()), 0, &[Agent::Gemini]);
+        assert_eq!(read, ReadCounts::from([(Agent::Gemini, 2)]));
+        assert!(claims.iter().all(|(_, c)| c.agent == Agent::Gemini));
+        let mut options = ReportOptions::parse(&args("--source gemini")).unwrap();
+        options.sources = vec![Agent::Gemini];
+        let summary = summarise(&claims, &options, &read);
+        let text = render_report(&summary);
+        assert!(text.starts_with("Gemini CLI success claims"), "{text}");
+        // One agent: no per-agent lines and no agent on each claim.
+        assert!(!text.contains("Gemini CLI  session"), "{text}");
+    }
+
+    #[test]
+    fn a_claude_only_report_reads_as_it_always_did() {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            "p/s.jsonl",
+            &Script::new().user("go").say("Deployed.").text(),
+        );
+        let (claims, read) = collect_inputs(from_inputs(dir.path()), 0, &Agent::ALL);
+        let summary = summarise(&claims, &ReportOptions::parse(&[]).unwrap(), &read);
+        let text = render_report(&summary);
+        assert!(
+            text.starts_with("Claude Code success claims, last 30 days"),
+            "{text}"
+        );
+        assert!(
+            text.contains("\n  2026-11-14 10:00 UTC  session s-1  p\n"),
+            "{text}"
+        );
+        assert!(render_card(&summary).contains("| Claude Code, last 30 days"));
+    }
+
+    #[test]
+    fn the_gate_reads_a_codex_rollout() {
+        // The second turn ran only `git status`, so Codex's Stop hook payload
+        // for it is blocked; Codex sends the final message in the payload.
+        let p = json!({
+            "hook_event_name": "Stop",
+            "session_id": "019a0c1e",
+            "turn_id": "t-2",
+            "transcript_path": "/home/dev/.codex/sessions/rollout.jsonl",
+            "cwd": "/home/dev/parser",
+            "model": "gpt-5-codex",
+            "permission_mode": "default",
+            "stop_hook_active": false,
+            "last_assistant_message": "Done. Token is now Lexeme in all 9 files."
+        });
+        match decide(&p, |_| Some(CODEX_PAGINATED.to_string())) {
+            Verdict::Block(message) => {
+                assert!(message.contains("git status --short"), "{message}");
+                assert!(message.contains("(exit 0)"), "{message}");
+            }
+            Verdict::Allow => panic!("should block"),
+        }
+        // A turn that ran the tests is let through.
+        let first_turn: String = CODEX_PAGINATED
+            .lines()
+            .take(16)
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut ok = p.clone();
+        ok["last_assistant_message"] = json!("All 12 tests pass.");
+        assert_eq!(decide(&ok, |_| Some(first_turn.clone())), Verdict::Allow);
+        // Codex can send no transcript at all.
+        let mut none = p.clone();
+        none["transcript_path"] = Value::Null;
+        assert_eq!(decide(&none, |_| None), Verdict::Allow);
+    }
+
+    #[test]
+    fn the_gate_reads_a_gemini_session_from_an_after_agent_hook() {
+        let p = json!({
+            "hook_event_name": "AfterAgent",
+            "session_id": "6f1d2a40",
+            "transcript_path": "/home/dev/.gemini/tmp/9c1f/chats/session-a.jsonl",
+            "cwd": "/home/dev/app",
+            "timestamp": "2026-11-14T12:03:10.000Z",
+            "prompt": "push it",
+            "prompt_response": "Pushed to main. Deployed.",
+            "stop_hook_active": false
+        });
+        match decide(&p, |_| Some(GEMINI_SESSION.to_string())) {
+            Verdict::Block(message) => {
+                assert!(message.contains("Deployed."), "{message}");
+                assert!(message.contains("git push origin main"), "{message}");
+            }
+            Verdict::Allow => panic!("should block"),
+        }
+        let mut again = p.clone();
+        again["stop_hook_active"] = json!(true);
+        assert_eq!(
+            decide(&again, |_| Some(GEMINI_SESSION.to_string())),
+            Verdict::Allow
+        );
+    }
+
+    #[test]
+    fn a_forced_source_reads_the_transcript_as_that_format() {
+        let p = json!({"transcript_path": "t", "last_assistant_message": "Deployed."});
+        // Read as Claude Code, a Codex rollout has no turns: nothing ran.
+        match decide_as(&p, Some(Agent::Claude), |_| Some(CODEX_LEGACY.to_string())) {
+            Verdict::Block(message) => assert!(message.contains("No command ran"), "{message}"),
+            Verdict::Allow => panic!("should block"),
+        }
+        // Read as what it is, the last turn's command is named.
+        match decide_as(&p, Some(Agent::Codex), |_| Some(CODEX_LEGACY.to_string())) {
+            Verdict::Block(message) => assert!(message.contains("npm run build"), "{message}"),
+            Verdict::Allow => panic!("should block"),
+        }
     }
 }

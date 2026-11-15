@@ -1,15 +1,21 @@
-//! Done-claims in Claude Code transcripts, and whether anything backed them.
+//! Done-claims in AI coding-agent transcripts, and whether anything backed them.
 //!
 //! An assistant that writes "all tests pass" has made a claim about the world.
 //! The transcript says whether it ran anything that could have told it so. This
-//! module reads one transcript (Claude Code's JSON-lines format, one entry per
-//! line) and answers, turn by turn:
+//! module answers, turn by turn:
 //!
 //! * did the assistant claim success ("tests pass", "done", "fixed",
 //!   "deployed", "all green", and close variants), and
-//! * did a check pass in that turn or in the turn just before it: a `Bash` or
-//!   `PowerShell` tool call that ran tests, a build or a linter and came back
-//!   with exit code 0.
+//! * did a check pass in that turn or in the turn just before it: a shell
+//!   command that ran tests, a build or a linter and came back with exit
+//!   code 0.
+//!
+//! Every agent writes its log differently, so each format is first turned into
+//! the same short list of [`Event`]s (the user typed something, a shell command
+//! finished, the assistant wrote text) and [`fold`] judges that list. This
+//! module reads Claude Code's JSON-lines format ([`analyse`]); `crate::codex`
+//! and `crate::gemini` read OpenAI Codex CLI and Gemini CLI sessions into the
+//! same events, and `crate::agents` picks the reader for a file.
 //!
 //! A *turn* starts at a prompt the user typed and runs until the next one. Tool
 //! results arrive as `user` entries too, so they do not start a turn. Only the
@@ -23,6 +29,8 @@
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+
+use crate::agents::Agent;
 
 /// One shell command the assistant ran, and what came of it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -40,6 +48,20 @@ pub struct Run {
 }
 
 impl Run {
+    /// A command that finished with `exit` and printed `output`: whether it
+    /// was a check, and whether its output contradicts a zero exit code, are
+    /// worked out here so every transcript format judges them the same way.
+    pub fn new(command: String, exit: Option<i64>, output: &str) -> Run {
+        let check = is_check_command(&command);
+        let failure_in_output = check && exit == Some(0) && shows_failure(output);
+        Run {
+            command,
+            exit,
+            check,
+            failure_in_output,
+        }
+    }
+
     /// A check that ran and passed.
     pub fn passed(&self) -> bool {
         self.check && self.exit == Some(0) && !self.failure_in_output
@@ -49,7 +71,9 @@ impl Run {
 /// One assistant turn that claimed success.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Claim {
-    /// The Claude Code session the turn belongs to.
+    /// The agent whose transcript the claim came from.
+    pub agent: Agent,
+    /// The session the turn belongs to.
     pub session: String,
     /// The timestamp of the message that made the claim, as written.
     pub timestamp: String,
@@ -86,6 +110,33 @@ pub struct Transcript {
     pub claims: Vec<Claim>,
     /// The last turn, finished or not.
     pub final_turn: FinalTurn,
+    /// The project the session worked in, when the transcript names it
+    /// (Codex records its working directory, Gemini CLI a project hash).
+    /// `None` for Claude Code, whose project is the folder the file is in.
+    pub project: Option<String>,
+}
+
+/// One thing that happened in a conversation, whatever agent wrote it down.
+///
+/// Every transcript reader produces these, in the order they happened, and
+/// [`fold`] turns them into claims. That is what keeps "what is a turn",
+/// "what is a check" and "what is a claim" the same for every agent.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Event {
+    /// Something the user typed: a new turn starts.
+    Prompt,
+    /// A shell command the assistant ran finished (or was refused, or sent
+    /// to the background: then its exit code is `None`).
+    Run(Run),
+    /// The assistant wrote some text.
+    Text {
+        /// What it wrote.
+        text: String,
+        /// The session it belongs to.
+        session: String,
+        /// When, as the transcript wrote it (RFC 3339).
+        timestamp: String,
+    },
 }
 
 #[derive(Default)]
@@ -101,18 +152,75 @@ impl Turn {
     }
 }
 
-/// Read one transcript.
+/// Judge a conversation, given as [`Event`]s in order, turn by turn.
+///
+/// A claim is backed when a check passed anywhere in its turn or in the turn
+/// before it. Only the last claim in a turn is kept. The returned
+/// transcript's `project` is `None`; a reader that knows it fills it in.
+pub fn fold(agent: Agent, events: impl IntoIterator<Item = Event>) -> Transcript {
+    let mut claims = Vec::new();
+    let mut previous = Turn::default();
+    let mut current = Turn::default();
+    for event in events {
+        match event {
+            Event::Prompt => {
+                previous = close(std::mem::take(&mut current), &previous, &mut claims);
+            }
+            Event::Run(run) => current.runs.push(run),
+            Event::Text {
+                text,
+                session,
+                timestamp,
+            } => {
+                if text.trim().is_empty() {
+                    continue;
+                }
+                if let Some((sentence, phrase)) = find_claim(&text) {
+                    let last = current.runs.last().or(previous.runs.last());
+                    current.claim = Some(Claim {
+                        agent,
+                        session,
+                        at_ms: parse_timestamp_ms(&timestamp),
+                        timestamp,
+                        text: sentence,
+                        phrase,
+                        backed: false,
+                        last_command: last.map(|run| run.command.clone()),
+                        last_exit: last.and_then(|run| run.exit),
+                    });
+                }
+                current.last_text = Some(text);
+            }
+        }
+    }
+    let final_turn = FinalTurn {
+        last_text: current.last_text.clone(),
+        passed: current.passed(),
+        last_run: current.runs.last().cloned(),
+    };
+    close(current, &previous, &mut claims);
+    Transcript {
+        claims,
+        final_turn,
+        project: None,
+    }
+}
+
+/// Read one Claude Code transcript.
 ///
 /// Lines that are not JSON, entries that are neither `user` nor `assistant`,
 /// and subagent entries mixed into a main session are skipped. A file that is
 /// all subagent entries (Claude Code writes those to their own files) is read
 /// as a conversation of its own.
 pub fn analyse(transcript: &str) -> Transcript {
-    let mut claims = Vec::new();
-    let mut previous = Turn::default();
-    let mut current = Turn::default();
-    // tool_use id -> (command, is check, sent to background)
-    let mut pending: HashMap<String, (String, bool, bool)> = HashMap::new();
+    fold(Agent::Claude, claude_events(transcript))
+}
+
+/// The [`Event`]s in a Claude Code transcript.
+pub fn claude_events(transcript: &str) -> Vec<Event> {
+    let mut events = Vec::new();
+    // tool_use id -> (command, sent to background)
+    let mut pending: HashMap<String, (String, bool)> = HashMap::new();
     let mut sidechain: Option<bool> = None;
 
     for line in transcript.lines() {
@@ -153,12 +261,12 @@ pub fn analyse(transcript: &str) -> Transcript {
                 .unwrap_or_default();
             if results.is_empty() {
                 // Something the user typed: a new turn.
-                previous = close(std::mem::take(&mut current), &previous, &mut claims);
+                events.push(Event::Prompt);
                 continue;
             }
             for block in results {
                 let id = block["tool_use_id"].as_str().unwrap_or_default();
-                let Some((command, check, background)) = pending.remove(id) else {
+                let Some((command, background)) = pending.remove(id) else {
                     continue;
                 };
                 let output = content_text(&block["content"]);
@@ -167,13 +275,7 @@ pub fn analyse(transcript: &str) -> Transcript {
                 } else {
                     exit_code(block, &entry, &output)
                 };
-                let failure_in_output = check && exit == Some(0) && shows_failure(&output);
-                current.runs.push(Run {
-                    command,
-                    exit,
-                    check,
-                    failure_in_output,
-                });
+                events.push(Event::Run(Run::new(command, exit, &output)));
             }
             continue;
         }
@@ -194,9 +296,8 @@ pub fn analyse(transcript: &str) -> Transcript {
                         .unwrap_or_default()
                         .to_string();
                     let background = block["input"]["run_in_background"].as_bool() == Some(true);
-                    let check = is_check_command(&command);
                     if let Some(id) = block["id"].as_str() {
-                        pending.insert(id.to_string(), (command, check, background));
+                        pending.insert(id.to_string(), (command, background));
                     }
                 }
                 Some("text") => {
@@ -204,33 +305,17 @@ pub fn analyse(transcript: &str) -> Transcript {
                     if text.trim().is_empty() {
                         continue;
                     }
-                    current.last_text = Some(text.to_string());
-                    if let Some((sentence, phrase)) = find_claim(text) {
-                        let last = current.runs.last().or(previous.runs.last());
-                        current.claim = Some(Claim {
-                            session: entry["sessionId"].as_str().unwrap_or_default().to_string(),
-                            timestamp: entry["timestamp"].as_str().unwrap_or_default().to_string(),
-                            at_ms: entry["timestamp"].as_str().and_then(parse_timestamp_ms),
-                            text: sentence,
-                            phrase,
-                            backed: false,
-                            last_command: last.map(|run| run.command.clone()),
-                            last_exit: last.and_then(|run| run.exit),
-                        });
-                    }
+                    events.push(Event::Text {
+                        text: text.to_string(),
+                        session: entry["sessionId"].as_str().unwrap_or_default().to_string(),
+                        timestamp: entry["timestamp"].as_str().unwrap_or_default().to_string(),
+                    });
                 }
                 _ => {}
             }
         }
     }
-
-    let final_turn = FinalTurn {
-        last_text: current.last_text.clone(),
-        passed: current.passed(),
-        last_run: current.runs.last().cloned(),
-    };
-    close(current, &previous, &mut claims);
-    Transcript { claims, final_turn }
+    events
 }
 
 /// End a turn: its claim, if it made one, is backed when a check passed in it

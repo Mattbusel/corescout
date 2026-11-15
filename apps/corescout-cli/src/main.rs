@@ -13,7 +13,10 @@
 //! anything that wants to parse it, and it is the same object the app receives,
 //! not a summary of it.
 
+mod agents;
 mod claims;
+mod codex;
+mod gemini;
 mod report;
 mod watch;
 
@@ -45,8 +48,10 @@ SEEING WHAT IT KNOWS
     states                  The recurring states it found in itself
 
 CHECKING WHAT YOUR AI CLAIMS
-    report [OPTIONS]        Claude Code turns that said 'done' with no passing check
-    gate                    Claude Code Stop hook: block 'done' with no check run
+    report [OPTIONS]        AI turns that said 'done' with no passing check
+                            (Claude Code, Codex, Gemini CLI)
+    gate [--source <AGENT>] Stop hook (Claude Code, Codex) or AfterAgent hook
+                            (Gemini CLI): block 'done' with no check run
 
 CONNECTING AN AI
     ai                      Which AI systems have connected
@@ -84,9 +89,11 @@ OPTIONS FOR report
     --top <N>               How many recent unbacked claims to list (10)
     --card                  A one-screen card with no names or messages in it
     --json                  Everything, for a program
-    --no-store              Do not keep a copy of the transcripts
-    --from <DIR>            Read transcripts from here, not ~/.claude/projects.
-                            Only that folder is read, in place; nothing is copied.
+    --no-store              Do not keep a copy of the Claude Code transcripts
+    --from <DIR>            Read transcripts from here, not where the agents keep
+                            them. Only that folder is read, in place; nothing is
+                            copied. Each file's format is told from its contents.
+    --source <AGENT>        claude, codex, gemini or all (all)
 
 OPTIONS
     --json                  The raw answer, as the app receives it
@@ -97,6 +104,7 @@ EXAMPLES
     corescout run --placement fast -- cargo test
     corescout use cap-1
     corescout report --days 7 --card
+    corescout report --source codex
 
 Everything stays on this computer. Nothing is sent anywhere.
 ";
@@ -860,6 +868,7 @@ mod tests {
             "--json",
             "--no-store",
             "--from",
+            "--source",
         ] {
             let block = USAGE
                 .split("OPTIONS FOR report")

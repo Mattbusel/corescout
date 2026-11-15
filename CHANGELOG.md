@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.4.0 (2026-11-15)
+
+- `corescout report` and `corescout gate` read OpenAI Codex and Gemini CLI sessions as
+  well as Claude Code transcripts, each into the same claims and checks: a turn, the
+  shell commands run in it with their exit codes, and the text the assistant wrote.
+  - Codex: `~/.codex/sessions/**/*.jsonl` and `~/.codex/archived_sessions`
+    (`$CODEX_HOME`). All three rollout formats are read: current rollouts' completed
+    items (`UserMessage`, `AgentMessage`, `CommandExecution`), the 2025 to mid-2026
+    `user_message`/`agent_message` events with `shell`, `shell_command`,
+    `exec_command`, `local_shell_call` and code-mode `exec` tool calls, and the
+    original unwrapped format. Commands you ran yourself (`!cmd`) are not counted;
+    a command still running when Codex moved on has no exit code.
+  - Gemini CLI: `~/.gemini/tmp/<project hash>/chats/` (`$GEMINI_CLI_HOME`), both the
+    JSON-lines sessions, replayed with their rewinds, patches and re-written
+    messages the way Gemini CLI loads them, and the older single-object `.json`.
+    Shell commands are `run_shell_command` calls; the exit code comes from the
+    `Exit Code:` trailer.
+  - Cursor is not read: its transcript format is not documented.
+- `report --source claude|codex|gemini|all` (default `all`) picks the agents. With more
+  than one agent installed the report and the card give each agent's share and the
+  report names the agent on every claim it lists; with only Claude Code the output is
+  what it was. `--json` adds `sources`, `sources_searched`, `transcripts_by_source`,
+  `by_source` and a `source` on each item in `top_unbacked`.
+- `report --from <DIR>` tells each file's format from its contents, so one folder can
+  hold transcripts from every agent.
+- `gate` works as a Codex `Stop` hook and a Gemini CLI `AfterAgent` hook: it reads
+  the final message from `last_assistant_message` or `prompt_response` and the
+  transcript in whichever format it is; `--source` forces one. Codex setup is in
+  `docs/CODEX.md`, Gemini CLI's in `docs/CLAIMS.md`.
+
 ## 1.3.0 (2026-11-14)
 
 - `corescout report` reads Claude Code transcripts (`~/.claude/projects/**/*.jsonl`)
