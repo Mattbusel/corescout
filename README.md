@@ -1,4 +1,6 @@
-# CoreScout
+# CoreScout: most of what your AI "learned" is a correlation
+
+Agent memory today is a notes file: whatever someone wrote down, plus whatever showed up together often enough to look like a rule. CoreScout records what actually happened on the machine and keeps "seen together" apart from "verified", and only trials it decided by coin flip can support a claim that one thing causes another. On one Windows machine, after 73 days of watching, 4,200 AI tool actions and 1.66 million observations, it has verified 0 procedures. That zero is the honest number most memory tools never show.
 
 <!-- outcome-block -->
 **Your AI stops rediscovering the same failures every session: CoreScout remembers what happened on your machine and tells your AI before it repeats a mistake.**

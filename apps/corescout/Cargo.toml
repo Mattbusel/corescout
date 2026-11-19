@@ -1,6 +1,6 @@
 [package]
 name = "corescout"
-description = "A computational mirror: what this machine physically is, right now."
+description = "Most of what your AI learned is a correlation: local-first memory of what actually happened on your machine, with seen-together kept apart from verified. MCP server, Rust."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
